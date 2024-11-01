@@ -1,126 +1,153 @@
 use clap::{Command as ClapCommand, Arg};
-use std::process::{Command, Stdio};
-use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::path::PathBuf;
+use std::env;
+use dirs::home_dir;
 
-fn get_last_command() -> Option<String> {
-    // Create a new Command for bash in interactive mode
-    let mut child = Command::new("bash")
-        .arg("-i")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())  // Suppress stderr as bash might print some startup messages
-        .spawn()
-        .ok()?;
+const SHELL_SCRIPT: &str = r#"#!/bin/bash
+history > /tmp/last_commands.txt
+"#;
 
-    // Write the history command to stdin
-    // Get the last 3 commands to account for both 'history' and 'exit' commands
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(b"history 3\n").ok()?;
-        stdin.write_all(b"exit\n").ok()?;
+const SHELL_FUNCTION: &str = r#"
+komando() {
+    history > /tmp/last_commands.txt
+    echo "Last commands:"
+    cat /tmp/last_commands.txt
+    RUST_PROGRAM="$1"
+    if [ -x "$RUST_PROGRAM" ]; then
+        "$RUST_PROGRAM" "${@:2}"
+    else
+        echo "Error: Komando executable not found"
+    fi
+}
+"#;
+
+fn setup_shell_integration() -> std::io::Result<()> {
+    // Create shell script
+    let script_path = "/tmp/komando_history.sh";
+    let mut file = File::create(script_path)?;
+    file.write_all(SHELL_SCRIPT.as_bytes())?;
+    fs::set_permissions(script_path, fs::Permissions::from_mode(0o755))?;
+
+    // Detect shell type
+    let shell = env::var("SHELL").unwrap_or_else(|_| String::from("/bin/bash"));
+    let rc_file = if shell.contains("zsh") {
+        PathBuf::from(env::var("HOME").map_err(|e| io::Error::new(io::ErrorKind::Other, e))?).join(".zshrc")
+    } else {
+        PathBuf::from(env::var("HOME").map_err(|e| io::Error::new(io::ErrorKind::Other, e))?).join(".bashrc")
+    };
+
+    // Check if integration is already set up
+    if let Ok(content) = fs::read_to_string(&rc_file) {
+        if content.contains("komando()") {
+            return Ok(());
+        }
     }
 
-    // Get the output
-    let output = child.wait_with_output().ok()?;
-    
-    if output.status.success() {
-        let output_str = String::from_utf8_lossy(&output.stdout);
-        // Get all non-empty lines
-        let lines: Vec<&str> = output_str
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .collect();
+    // Add shell function to rc file if user approves
+    println!("Would you like to set up shell integration for easier command history access? (y/N)");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input)?;
+    if input.trim().to_lowercase() == "y" {
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(rc_file)?;
+        writeln!(file, "\n# Komando shell integration")?;
+        writeln!(file, "{}", SHELL_FUNCTION)?;
+        println!("Shell integration installed. Please restart your shell or run 'source ~/.bashrc' (or ~/.zshrc)");
+    }
 
-        // Get the first line (which should be the command before our 'history' command)
-        if let Some(line) = lines.first() {
-            // Parse out the command (skip the history number)
-            let command = line
-                .split_whitespace()
-                .skip(1)  // Skip the history number
-                .collect::<Vec<&str>>()
-                .join(" ");
-            
-            if !command.is_empty() && !command.starts_with("history") {
-                Some(command)
-            } else if lines.len() > 1 {
-                // If the first command was 'history', try the second line
-                let command = lines[1]
-                    .split_whitespace()
-                    .skip(1)
-                    .collect::<Vec<&str>>()
-                    .join(" ");
-                
-                if !command.is_empty() && !command.starts_with("history") {
-                    Some(command)
+    Ok(())
+}
+
+fn get_last_commands(count: usize) -> Vec<String> {   
+
+    let file_content = fs::read_to_string("/tmp/last_commands.txt").ok();
+    
+    let content = if let Some(content) = file_content {
+        println!("File content: {}", content);
+        content
+    } else {
+        println!("No file content");
+        return Vec::new();
+    };
+
+    // Process the commands
+    content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.trim().splitn(2, ' ').collect();
+            if parts.len() == 2 {
+                let cmd = parts[1].trim();
+                if !cmd.is_empty() && 
+                   !cmd.starts_with("history") && 
+                   !cmd.starts_with("komando") {
+                    Some(cmd.to_string())
                 } else {
                     None
                 }
             } else {
                 None
             }
-        } else {
-            None
-        }
-    } else {
-        None
-    }
+        })
+        .rev()
+        .take(count)
+        .collect()
 }
 
-fn main() {
+fn main() -> std::io::Result<()> {
     let matches = ClapCommand::new("Komando")
         .version("0.1.0")
         .author("Noureddine Gueddach")
         .about("A command line utility to better organize and keep track of your commands.")
         .arg(
-            Arg::new("input")
-                .short('i')
-                .long("input")
-                .value_name("FILE")
-                .help("Sets an input file")
-                .num_args(1),
+            Arg::new("setup")
+                .long("setup")
+                .help("Set up shell integration")
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
-            Arg::new("verbose")
-                .short('v')
-                .long("verbose")
-                .help("Print additional information")
-        )
-        .arg(
-            Arg::new("debug")
-                .short('d')
-                .long("debug")
-                .help("Print debug information about history commands")
+            Arg::new("count")
+                .short('n')
+                .long("number")
+                .value_name("COUNT")
+                .help("Number of commands to show (default: 5)")
+                .value_parser(clap::value_parser!(usize))
+                .default_value("5"),
         )
         .get_matches();
 
-    let debug = matches.contains_id("debug");
+    if matches.get_flag("setup") {
+        setup_shell_integration()?;
+        println!("Setup complete. Run 'komando' to access your command history.");
+        return Ok(());
+    }
 
-    // If debug mode is enabled, show raw output
-    if debug {
-        println!("Attempting to get history through interactive shell:");
-        
-        if let Ok(mut child) = Command::new("bash")
-            .arg("-i")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn() {
-            
-            if let Some(mut stdin) = child.stdin.take() {
-                let _ = stdin.write_all(b"history 3\nexit\n");
-            }
-            
-            if let Ok(output) = child.wait_with_output() {
-                println!("Raw output:\n{}", String::from_utf8_lossy(&output.stdout));
+    let count = matches.get_one::<usize>("count").copied().unwrap_or(5);
+    let commands = get_last_commands(count);
+
+    // If the storage file does not exist, create it:
+    if let Some(home_path) = home_dir() {
+        let storage_path = home_path.join(".komando.json");
+        if !storage_path.exists() {
+            let mut file = File::create(&storage_path)?;
+            file.write_all(b"")?;
+        }
+
+        if commands.is_empty() {
+            println!("No commands found. Try running with --setup to configure shell integration.");
+        } else {
+            println!("Last {} commands:", commands.len());
+            for (i, cmd) in commands.iter().enumerate() {
+                println!("{}. {}", i + 1, cmd);
             }
         }
+    } else {
+        println!("Could not determine home directory.");
     }
 
-    match get_last_command() {
-        Some(cmd) => println!("Last command: {}", cmd),
-        None => println!("No last command found. Make sure you have bash history enabled."),
-    }
-
-    if let Some(input_file) = matches.get_one::<String>("input") {
-        println!("Input file: {}", input_file);
-    }
+    Ok(())
 }
