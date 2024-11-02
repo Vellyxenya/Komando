@@ -19,8 +19,12 @@ komando() {
     history > /tmp/last_commands.txt
     RUST_PROGRAM="./target/debug/komando_executable"
     if [ -x "$RUST_PROGRAM" ]; then
-        OUTPUT=$("$RUST_PROGRAM" "${@:2}" 2>&1 1>/dev/tty)
+        OUTPUT=$("$RUST_PROGRAM" "$@" 2>&1 1>/dev/tty)
         
+        if [ -z "$OUTPUT" ]; then
+            return
+        fi
+
         IFS=';' read -r DIR CMD <<< "$OUTPUT"
         echo ""
         echo "=========== Edit the command and then hit 'Enter' ==========="
@@ -113,6 +117,8 @@ fn get_last_commands(count: usize) -> Vec<String> {
 }
 
 fn main() -> std::io::Result<()> {
+    // println!("Debug: Received arguments: {:?}", std::env::args().collect::<Vec<_>>());
+
     let matches = ClapCommand::new("Komando")
         .version("0.1.0")
         .author("Noureddine Gueddach")
@@ -121,6 +127,13 @@ fn main() -> std::io::Result<()> {
             Arg::new("setup")
                 .long("setup")
                 .help("Set up shell integration")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("save")
+                .short('s')
+                .long("save")
+                .help("Save the last command to a file")
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(
@@ -149,6 +162,18 @@ fn main() -> std::io::Result<()> {
         if !storage_path.exists() {
             let mut file = File::create(&storage_path)?;
             file.write_all(b"")?;
+        }
+        if matches.get_flag("save") {
+            //Get the last command:
+            let last_command = commands.first().unwrap();
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                .open(&storage_path)?;
+            writeln!(file, "{}", last_command)?;
+            println!(">>> Saved command: {}", last_command);
+            return Ok(());
+        } else {
+            println!("Does not save the last command");
         }
     } else {
         println!("Could not determine home directory.");
