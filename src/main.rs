@@ -13,11 +13,17 @@ history > /tmp/last_commands.txt
 const SHELL_FUNCTION: &str = r#"
 komando() {
     history > /tmp/last_commands.txt
-    echo "Last commands:"
-    cat /tmp/last_commands.txt
-    RUST_PROGRAM="$1"
+    RUST_PROGRAM="./target/debug/komando_executable"
     if [ -x "$RUST_PROGRAM" ]; then
-        "$RUST_PROGRAM" "${@:2}"
+        OUTPUT=$("$RUST_PROGRAM" "${@:2}")
+        # echo "$OUTPUT"
+
+        # cd <somewhere indicated in the OUTPUT>
+        
+        read -e -i "$OUTPUT" COMMAND
+        if [ -n "$COMMAND" ]; then
+            eval "$COMMAND"
+        fi
     else
         echo "Error: Komando executable not found"
     fi
@@ -67,7 +73,6 @@ fn get_last_commands(count: usize) -> Vec<String> {
     let file_content = fs::read_to_string("/tmp/last_commands.txt").ok();
     
     let content = if let Some(content) = file_content {
-        println!("File content: {}", content);
         content
     } else {
         println!("No file content");
@@ -140,10 +145,11 @@ fn main() -> std::io::Result<()> {
         if commands.is_empty() {
             println!("No commands found. Try running with --setup to configure shell integration.");
         } else {
-            println!("Last {} commands:", commands.len());
-            for (i, cmd) in commands.iter().enumerate() {
-                println!("{}. {}", i + 1, cmd);
-            }
+            // println!("Last {} commands:", commands.len());
+            // for (i, cmd) in commands.iter().enumerate() {
+            //     println!("{}. {}", i + 1, cmd);
+            // }
+            println!("ls")
         }
     } else {
         println!("Could not determine home directory.");
