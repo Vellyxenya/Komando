@@ -1,10 +1,18 @@
 use clap::{Command as ClapCommand, Arg};
+use crossterm::{
+    cursor::{MoveTo, Hide},
+    event::{self, Event, KeyCode},
+    style::Print,
+    terminal::{self, ClearType, Clear},
+    queue,
+};
 use std::os::unix::fs::PermissionsExt;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::env;
 use dirs::home_dir;
+use std::io::stdout;
 
 const SHELL_SCRIPT: &str = r#"#!/bin/bash
 history > /tmp/last_commands.txt
@@ -142,21 +150,71 @@ fn main() -> std::io::Result<()> {
             let mut file = File::create(&storage_path)?;
             file.write_all(b"")?;
         }
-
-        if commands.is_empty() {
-            println!("No commands found. Try running with --setup to configure shell integration.");
-        } else {
-            println!("Last {} commands:", commands.len());
-            for (i, cmd) in commands.iter().enumerate() {
-                println!("{}. {}", i + 1, cmd);
-            }
-            let dir = "."; // default to current directory
-            let cmd = "ls"; // default to ls
-            eprintln!("{};{}", dir, cmd);
-        }
     } else {
         println!("Could not determine home directory.");
+        // Exit early if we can't determine the home directory
+        return Ok(());
     }
 
+    // Interactive command selection
+    terminal::enable_raw_mode()?;
+    let mut stdout = stdout();
+    let mut selected = 0;
+
+    loop {
+        // Clear screen and reset cursor
+        queue!(
+            stdout,
+            Clear(ClearType::All),
+            MoveTo(0, 0),
+            Hide  // Hide cursor while displaying menu
+        )?;
+
+        // Display commands with proper formatting
+        for (i, cmd) in commands.iter().enumerate() {
+            let prefix = if i == selected { "> " } else { "  " };
+            let number = format!("{}. ", i + 1);
+            
+            // Clear the entire line first
+            queue!(
+                stdout,
+                MoveTo(0, i as u16),
+                Clear(ClearType::CurrentLine),
+                Print(prefix),
+                Print(number),
+                Print(cmd),
+            )?;
+        }
+        
+        // Make sure to flush the output
+        stdout.flush()?;
+
+        if let Event::Key(key_event) = event::read()? {
+            match key_event.code {
+                KeyCode::Up => {
+                    if selected > 0 {
+                        selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if selected < commands.len() - 1 {
+                        selected += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    let dir = "."; // default to current directory
+                    let cmd = &commands[selected];
+                    eprintln!("{};{}", dir, cmd);
+                    break;
+                }
+                KeyCode::Esc => {
+                    break;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    terminal::disable_raw_mode()?;
     Ok(())
 }
