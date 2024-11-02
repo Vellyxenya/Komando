@@ -1,10 +1,6 @@
 use clap::{Command as ClapCommand, Arg};
 use crossterm::{
-    cursor::{MoveTo, Hide},
-    event::{self, Event, KeyCode},
-    style::Print,
-    terminal::{self, ClearType, Clear},
-    queue,
+    cursor::{Hide, MoveTo, Show}, event::{self, Event, KeyCode}, execute, queue, style::Print, terminal::{self, Clear, ClearType}
 };
 use std::os::unix::fs::PermissionsExt;
 use std::fs::{self, File};
@@ -26,10 +22,14 @@ komando() {
         OUTPUT=$("$RUST_PROGRAM" "${@:2}" 2>&1 1>/dev/tty)
         
         IFS=';' read -r DIR CMD <<< "$OUTPUT"
+        echo ""
+        echo "=========== Edit the command and then hit 'Enter' ==========="
         echo "Directory: $DIR"
-        echo "Command: $CMD"
-
+        echo "Command:"
+        
         read -e -i "$CMD" COMMAND
+        echo ""
+        
         if [ -n "$COMMAND" ]; then
             cd "$DIR" && eval "$COMMAND"
         fi
@@ -215,6 +215,9 @@ fn main() -> std::io::Result<()> {
         }
     }
 
+    // Disable raw mode and show the cursor again
     terminal::disable_raw_mode()?;
+    execute!(stdout, Show)?;
+
     Ok(())
 }
