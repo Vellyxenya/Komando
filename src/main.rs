@@ -15,14 +15,15 @@ komando() {
     history > /tmp/last_commands.txt
     RUST_PROGRAM="./target/debug/komando_executable"
     if [ -x "$RUST_PROGRAM" ]; then
-        OUTPUT=$("$RUST_PROGRAM" "${@:2}")
-        # echo "$OUTPUT"
-
-        # cd <somewhere indicated in the OUTPUT>
+        OUTPUT=$("$RUST_PROGRAM" "${@:2}" 2>&1 1>/dev/tty)
         
-        read -e -i "$OUTPUT" COMMAND
+        IFS=';' read -r DIR CMD <<< "$OUTPUT"
+        echo "Directory: $DIR"
+        echo "Command: $CMD"
+
+        read -e -i "$CMD" COMMAND
         if [ -n "$COMMAND" ]; then
-            eval "$COMMAND"
+            cd "$DIR" && eval "$COMMAND"
         fi
     else
         echo "Error: Komando executable not found"
@@ -145,11 +146,13 @@ fn main() -> std::io::Result<()> {
         if commands.is_empty() {
             println!("No commands found. Try running with --setup to configure shell integration.");
         } else {
-            // println!("Last {} commands:", commands.len());
-            // for (i, cmd) in commands.iter().enumerate() {
-            //     println!("{}. {}", i + 1, cmd);
-            // }
-            println!("ls")
+            println!("Last {} commands:", commands.len());
+            for (i, cmd) in commands.iter().enumerate() {
+                println!("{}. {}", i + 1, cmd);
+            }
+            let dir = "."; // default to current directory
+            let cmd = "ls"; // default to ls
+            eprintln!("{};{}", dir, cmd);
         }
     } else {
         println!("Could not determine home directory.");
