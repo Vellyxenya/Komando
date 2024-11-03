@@ -228,6 +228,13 @@ fn main() -> Result<()> {
                 Print(cmd),
             )?;
         }
+
+        queue!(
+            stdout,
+            MoveTo(0, commands.len() as u16),
+            Print("Press 'Enter' to execute the selected command, 'Esc' to exit"),
+            Print("\n"),
+        )?;
         
         // Make sure to flush the output
         stdout.flush()?;
@@ -251,6 +258,11 @@ fn main() -> Result<()> {
                     break;
                 }
                 KeyCode::Esc => {
+                    queue!(
+                        stdout,
+                        MoveTo(0, (commands.len() + 1) as u16),
+                        Clear(ClearType::CurrentLine),
+                    )?;
                     break;
                 }
                 _ => {}
