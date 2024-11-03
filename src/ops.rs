@@ -8,8 +8,8 @@ use anyhow::{Result, Context};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Command {
     id: String,  // UUID for unique identification
-    command: String,
-    working_directory: String,
+    pub command: String,
+    pub working_directory: String,
     group: String,  // Primary group/category
     tags: HashSet<String>,  // Additional tags for flexible categorization
     description: Option<String>,

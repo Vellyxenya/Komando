@@ -30,6 +30,12 @@ komando() {
             return
         fi
 
+        # Check if the output contains a semicolon
+        if ! echo "$OUTPUT" | grep -q ";"; then
+            echo "$OUTPUT"
+            return
+        fi
+
         IFS=';' read -r DIR CMD <<< "$OUTPUT"
         echo ""
         echo "=========== Edit the command and then hit 'Enter' ==========="
@@ -40,6 +46,7 @@ komando() {
         echo ""
         
         if [ -n "$COMMAND" ]; then
+            echo "Executing '$COMMAND'..."
             cd "$DIR" && eval "$COMMAND"
         fi
     else
@@ -142,6 +149,14 @@ fn main() -> Result<()> {
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(
+            Arg::new("query")
+                .short('q')
+                .long("query")
+                .value_name("QUERY")
+                .help("Search for a command")
+                .num_args(1),
+        )
+        .arg(
             Arg::new("count")
                 .short('n')
                 .long("number")
@@ -192,6 +207,12 @@ fn main() -> Result<()> {
 
             store.save(&storage_path)?;
             return Ok(());
+        } else if let Some(query) = matches.get_one::<String>("query") {
+            let store = CommandStore::load(&storage_path)?;
+
+            let commands = store.search(query, None, None);
+        
+            interactively_process_commands(commands)?;
         }
     } else {
         println!("Could not determine home directory.");
@@ -199,12 +220,10 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    interactively_process_commands(last_commands)?;
-
     Ok(())
 }
 
-fn interactively_process_commands(commands: Vec<String>) -> Result<()> {
+fn interactively_process_commands(commands: Vec<&ops::Command>) -> Result<()> {
     // Interactive command selection
     terminal::enable_raw_mode()?;
     let mut stdout = stdout();
@@ -231,7 +250,7 @@ fn interactively_process_commands(commands: Vec<String>) -> Result<()> {
                 Clear(ClearType::CurrentLine),
                 Print(prefix),
                 Print(number),
-                Print(cmd),
+                Print(cmd.command.as_str()),
             )?;
         }
 
@@ -258,9 +277,10 @@ fn interactively_process_commands(commands: Vec<String>) -> Result<()> {
                     }
                 }
                 KeyCode::Enter => {
-                    let dir = "."; // default to current directory
                     let cmd = &commands[selected];
-                    eprintln!("{};{}", dir, cmd);
+                    let cmd_text = cmd.command.as_str();
+                    let cmd_dir = cmd.working_directory.as_str();
+                    eprintln!("{};{}", cmd_dir, cmd_text);
                     break;
                 }
                 KeyCode::Esc => {
