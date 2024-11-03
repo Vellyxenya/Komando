@@ -10,6 +10,8 @@ use std::env;
 use dirs::home_dir;
 use std::io::stdout;
 
+mod ops;
+
 const SHELL_SCRIPT: &str = r#"#!/bin/bash
 history > /tmp/last_commands.txt
 "#;
@@ -172,8 +174,6 @@ fn main() -> std::io::Result<()> {
             writeln!(file, "{}", last_command)?;
             println!(">>> Saved command: {}", last_command);
             return Ok(());
-        } else {
-            println!("Does not save the last command");
         }
     } else {
         println!("Could not determine home directory.");
