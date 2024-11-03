@@ -8,8 +8,8 @@ use std::io::{self, Write};
 const SHELL_FUNCTION: &str = r#"
 komando() {
     history > /tmp/last_commands.txt
-    RUST_PROGRAM="./target/debug/komando_exec"
-    if [ -x "$RUST_PROGRAM" ]; then
+    RUST_PROGRAM="komando_exec"
+    if command -v "$RUST_PROGRAM" > /dev/null 2>&1; then
         OUTPUT=$("$RUST_PROGRAM" "$@" 2>&1 1>/dev/tty)
         
         if [ -z "$OUTPUT" ]; then

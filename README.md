@@ -1,11 +1,32 @@
 # Komando
 A command line utility to help you organize and easily access your commands.
 
-# Install
+# Install from `Crates.io`
+Run:
+```bash
+cargo install komando
+```
+
+Then source your `.bashrc`:
+```bash
+source ~/.bashrc
+```
+
+Verify the installation works by running:
+```bash
+komando --help
+```
+
+# Build from source
 Run:
 ```bash
 cargo build --release
-sudo cp target/release/komando /usr/local/bin/
+sudo cp target/release/komando_exec /usr/local/bin/
+```
+
+And don't forget to source your `.bashrc`:
+```bash
+source ~/.bashrc
 ```
 
 Then verify the installation by running:
