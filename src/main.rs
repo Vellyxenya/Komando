@@ -9,8 +9,11 @@ use std::path::PathBuf;
 use std::env;
 use dirs::home_dir;
 use std::io::stdout;
+use anyhow::Result;
 
 mod ops;
+
+use ops::CommandStore;
 
 const SHELL_SCRIPT: &str = r#"#!/bin/bash
 history > /tmp/last_commands.txt
@@ -118,7 +121,7 @@ fn get_last_commands(count: usize) -> Vec<String> {
         .collect()
 }
 
-fn main() -> std::io::Result<()> {
+fn main() -> Result<()> {
     // println!("Debug: Received arguments: {:?}", std::env::args().collect::<Vec<_>>());
 
     let matches = ClapCommand::new("Komando")
@@ -165,14 +168,29 @@ fn main() -> std::io::Result<()> {
             let mut file = File::create(&storage_path)?;
             file.write_all(b"")?;
         }
+
+        let current_dir = env::current_dir()?;
+
         if matches.get_flag("save") {
             //Get the last command:
-            let last_command = commands.first().unwrap();
-            let mut file = fs::OpenOptions::new()
-                .append(true)
-                .open(&storage_path)?;
-            writeln!(file, "{}", last_command)?;
-            println!(">>> Saved command: {}", last_command);
+            let last_command = commands.first().unwrap();           
+
+            let mut store = CommandStore::load(&storage_path)?;
+
+            let working_dir = current_dir.to_str().unwrap();
+
+            // Add a new command
+            store.add_command(
+                last_command.to_string(),
+                working_dir.to_string(),
+                "default_group".to_string(),
+                ["default_tag"].iter().map(|&s| s.to_string()).collect(),
+                Some("".to_string()),
+            )?;
+
+            println!(">>> Saved command: {} at {}", last_command, working_dir);
+
+            store.save(&storage_path)?;
             return Ok(());
         }
     } else {

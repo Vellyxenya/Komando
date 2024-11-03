@@ -6,7 +6,7 @@ use anyhow::{Result, Context};
 
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Command {
+pub struct Command {
     id: String,  // UUID for unique identification
     command: String,
     working_directory: String,
@@ -17,7 +17,7 @@ struct Command {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct CommandStore {
+pub struct CommandStore {
     commands: Vec<Command>,
     groups: HashSet<String>,  // Track all unique groups
     tags: HashSet<String>,    // Track all unique tags
@@ -32,24 +32,27 @@ impl CommandStore {
         }
     }
 
-    fn load(path: &PathBuf) -> Result<Self> {
+    pub fn load(path: &PathBuf) -> Result<Self> {
         if !path.exists() {
             return Ok(Self::new());
         }
         let content = fs::read_to_string(path)
             .context("Failed to read command store")?;
+        if content.is_empty() {
+            return Ok(Self::new());
+        }
         serde_json::from_str(&content)
             .context("Failed to parse command store")
     }
 
-    fn save(&self, path: &PathBuf) -> Result<()> {
+    pub fn save(&self, path: &PathBuf) -> Result<()> {
         let content = serde_json::to_string_pretty(self)
             .context("Failed to serialize command store")?;
         fs::write(path, content)
             .context("Failed to write command store")
     }
 
-    fn add_command(&mut self, 
+    pub fn add_command(&mut self, 
         command: String, 
         working_dir: String,
         group: String, 
@@ -72,7 +75,7 @@ impl CommandStore {
         Ok(())
     }
 
-    fn search(&self, query: &str, group: Option<&str>, tags: Option<&HashSet<String>>) -> Vec<&Command> {
+    pub fn search(&self, query: &str, group: Option<&str>, tags: Option<&HashSet<String>>) -> Vec<&Command> {
         self.commands.iter()
             .filter(|cmd| {
                 // Match group if specified
@@ -96,7 +99,7 @@ impl CommandStore {
             .collect()
     }
 
-    fn update_command(&mut self, id: &str, updates: CommandUpdates) -> Result<()> {
+    pub fn update_command(&mut self, id: &str, updates: CommandUpdates) -> Result<()> {
         // First find the command and apply updates
         if let Some(cmd) = self.commands.iter_mut().find(|c| c.id == id) {
             if let Some(new_command) = updates.command {
@@ -138,7 +141,7 @@ impl CommandStore {
         }
     }
 
-    fn increment_usage(&mut self, id: &str) -> Result<()> {
+    pub fn increment_usage(&mut self, id: &str) -> Result<()> {
         if let Some(cmd) = self.commands.iter_mut().find(|c| c.id == id) {
             cmd.use_count += 1;
             Ok(())
@@ -149,7 +152,7 @@ impl CommandStore {
 }
 
 #[derive(Debug)]
-struct CommandUpdates {
+pub struct CommandUpdates {
     command: Option<String>,
     group: Option<String>,
     tags: Option<HashSet<String>>,
