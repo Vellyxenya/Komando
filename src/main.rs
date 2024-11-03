@@ -2,10 +2,8 @@ use clap::{Command as ClapCommand, Arg};
 use crossterm::{
     cursor::{Hide, MoveTo, Show}, event::{self, Event, KeyCode}, execute, queue, style::Print, terminal::{self, Clear, ClearType}
 };
-use std::os::unix::fs::PermissionsExt;
 use std::fs::{self, File};
-use std::io::{self, Write};
-use std::path::PathBuf;
+use std::io::Write;
 use std::env;
 use dirs::home_dir;
 use std::io::stdout;
@@ -15,83 +13,7 @@ mod ops;
 
 use ops::CommandStore;
 
-const SHELL_SCRIPT: &str = r#"#!/bin/bash
-history > /tmp/last_commands.txt
-"#;
 
-const SHELL_FUNCTION: &str = r#"
-komando() {
-    history > /tmp/last_commands.txt
-    RUST_PROGRAM="./target/debug/komando_executable"
-    if [ -x "$RUST_PROGRAM" ]; then
-        OUTPUT=$("$RUST_PROGRAM" "$@" 2>&1 1>/dev/tty)
-        
-        if [ -z "$OUTPUT" ]; then
-            return
-        fi
-
-        # Check if the output contains a semicolon
-        if ! echo "$OUTPUT" | grep -q ";"; then
-            echo "$OUTPUT"
-            return
-        fi
-
-        IFS=';' read -r DIR CMD <<< "$OUTPUT"
-        echo ""
-        echo "=========== Edit the command and then hit 'Enter' ==========="
-        echo "Directory: $DIR"
-        echo "Command:"
-        
-        read -e -i "$CMD" COMMAND
-        echo ""
-        
-        if [ -n "$COMMAND" ]; then
-            echo "Executing '$COMMAND'..."
-            cd "$DIR" && eval "$COMMAND"
-        fi
-    else
-        echo "Error: Komando executable not found"
-    fi
-}
-"#;
-
-fn setup_shell_integration() -> std::io::Result<()> {
-    // Create shell script
-    let script_path = "/tmp/komando_history.sh";
-    let mut file = File::create(script_path)?;
-    file.write_all(SHELL_SCRIPT.as_bytes())?;
-    fs::set_permissions(script_path, fs::Permissions::from_mode(0o755))?;
-
-    // Detect shell type
-    let shell = env::var("SHELL").unwrap_or_else(|_| String::from("/bin/bash"));
-    let rc_file = if shell.contains("zsh") {
-        PathBuf::from(env::var("HOME").map_err(|e| io::Error::new(io::ErrorKind::Other, e))?).join(".zshrc")
-    } else {
-        PathBuf::from(env::var("HOME").map_err(|e| io::Error::new(io::ErrorKind::Other, e))?).join(".bashrc")
-    };
-
-    // Check if integration is already set up
-    if let Ok(content) = fs::read_to_string(&rc_file) {
-        if content.contains("komando()") {
-            return Ok(());
-        }
-    }
-
-    // Add shell function to rc file if user approves
-    println!("Would you like to set up shell integration for easier command history access? (y/N)");
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input)?;
-    if input.trim().to_lowercase() == "y" {
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .open(rc_file)?;
-        writeln!(file, "\n# Komando shell integration")?;
-        writeln!(file, "{}", SHELL_FUNCTION)?;
-        println!("Shell integration installed. Please restart your shell or run 'source ~/.bashrc' (or ~/.zshrc)");
-    }
-
-    Ok(())
-}
 
 fn get_last_commands(count: usize) -> Vec<String> {   
 
@@ -136,12 +58,6 @@ fn main() -> Result<()> {
         .author("Noureddine Gueddach")
         .about("A command line utility to better organize and keep track of your commands.")
         .arg(
-            Arg::new("setup")
-                .long("setup")
-                .help("Set up shell integration")
-                .action(clap::ArgAction::SetTrue),
-        )
-        .arg(
             Arg::new("save")
                 .short('s')
                 .long("save")
@@ -166,12 +82,6 @@ fn main() -> Result<()> {
                 .default_value("5"),
         )
         .get_matches();
-
-    if matches.get_flag("setup") {
-        setup_shell_integration()?;
-        println!("Setup complete. Run 'komando' to access your command history.");
-        return Ok(());
-    }
 
     let count = matches.get_one::<usize>("count").copied().unwrap_or(5);
     let last_commands = get_last_commands(count);
