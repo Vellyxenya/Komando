@@ -159,7 +159,7 @@ fn main() -> Result<()> {
     }
 
     let count = matches.get_one::<usize>("count").copied().unwrap_or(5);
-    let commands = get_last_commands(count);
+    let last_commands = get_last_commands(count);
 
     // If the storage file does not exist, create it:
     if let Some(home_path) = home_dir() {
@@ -173,7 +173,7 @@ fn main() -> Result<()> {
 
         if matches.get_flag("save") {
             //Get the last command:
-            let last_command = commands.first().unwrap();           
+            let last_command = last_commands.first().unwrap();           
 
             let mut store = CommandStore::load(&storage_path)?;
 
@@ -199,6 +199,12 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
+    interactively_process_commands(last_commands)?;
+
+    Ok(())
+}
+
+fn interactively_process_commands(commands: Vec<String>) -> Result<()> {
     // Interactive command selection
     terminal::enable_raw_mode()?;
     let mut stdout = stdout();
