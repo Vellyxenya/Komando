@@ -2,6 +2,9 @@
 name = "komando_executable"
 version = "0.1.0"
 edition = "2021"
+description = "A command line utility to better organize and keep track of your commands."
+license = "MIT"
+repository = "https://github.com/Vellyxenya/Komando"
 
 [dependencies]
 clap = "4.0"
