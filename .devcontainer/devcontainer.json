@@ -1,0 +1,37 @@
+{
+	"name": "Komando (Rust)",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:1": {
+			"installZsh": true,
+			"configureZshAsDefaultShell": true,
+			"upgradePackages": true,
+			"username": "vscode"
+		}
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "cargo build && sudo cp target/debug/komando_exec /usr/local/bin/komando_exec",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"rust-lang.rust-analyzer",
+				"tamasfe.even-better-toml",
+				"serayuzgur.crates",
+				"mutantdino.resourcemonitor"
+			]
+		}
+	},
+
+	// Use 'remoteUser' to connect as a non-root user if available.
+	"remoteUser": "vscode"
+}

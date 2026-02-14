@@ -16,9 +16,15 @@ pub struct Command {
     use_count: u32,
 }
 
+impl Command {
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommandStore {
-    commands: Vec<Command>,
+    pub commands: Vec<Command>,
     groups: HashSet<String>,  // Track all unique groups
     tags: HashSet<String>,    // Track all unique tags
 }
@@ -59,6 +65,11 @@ impl CommandStore {
         tags: HashSet<String>,
         description: Option<String>
     ) -> Result<()> {
+        // Check for duplicate command in the same directory
+        if self.commands.iter().any(|c| c.command == command && c.working_directory == working_dir) {
+            anyhow::bail!("Command already exists in this directory");
+        }
+
         let cmd = Command {
             id: uuid::Uuid::new_v4().to_string(),
             command,
@@ -148,6 +159,25 @@ impl CommandStore {
         } else {
             anyhow::bail!("Command not found")
         }
+    }
+
+    pub fn list_all(&self) -> Vec<&Command> {
+        self.commands.iter().collect()
+    }
+
+    pub fn delete_command(&mut self, id: &str) -> Result<()> {
+        let initial_len = self.commands.len();
+        self.commands.retain(|c| c.id != id);
+        
+        if self.commands.len() == initial_len {
+            anyhow::bail!("Command not found");
+        }
+        
+        // Rebuild groups and tags from remaining commands
+        self.groups = self.commands.iter().map(|c| c.group.clone()).collect();
+        self.tags = self.commands.iter().flat_map(|c| c.tags.clone()).collect();
+        
+        Ok(())
     }
 }
 
