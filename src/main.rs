@@ -22,7 +22,6 @@ fn get_last_commands(count: usize) -> Vec<String> {
     let content = if let Some(content) = file_content {
         content
     } else {
-        println!("No file content");
         return Vec::new();
     };
 
@@ -73,6 +72,21 @@ fn main() -> Result<()> {
                 .num_args(1),
         )
         .arg(
+            Arg::new("list")
+                .short('l')
+                .long("list")
+                .help("List all saved commands")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("delete")
+                .short('d')
+                .long("delete")
+                .value_name("ID")
+                .help("Delete a command by ID")
+                .num_args(1),
+        )
+        .arg(
             Arg::new("count")
                 .short('n')
                 .long("number")
@@ -105,24 +119,152 @@ fn main() -> Result<()> {
             let working_dir = current_dir.to_str().unwrap();
 
             // Add a new command
-            store.add_command(
+            match store.add_command(
                 last_command.to_string(),
                 working_dir.to_string(),
                 "default_group".to_string(),
                 ["default_tag"].iter().map(|&s| s.to_string()).collect(),
                 Some("".to_string()),
-            )?;
+            ) {
+                Ok(_) => {
+                    println!(">>> Saved command: {} at {}", last_command, working_dir);
+                    store.save(&storage_path)?;
+                },
+                Err(e) => {
+                    eprintln!(">>> Warning: {}", e);
+                    // Don't save if it's a duplicate
+                }
+            }
 
-            println!(">>> Saved command: {} at {}", last_command, working_dir);
-
-            store.save(&storage_path)?;
+            return Ok(());
+        } else if matches.get_flag("list") {
+            let store = CommandStore::load(&storage_path)?;
+            let commands = store.list_all();
+            
+            if commands.is_empty() {
+                println!("No saved commands found.");
+            } else {
+                println!("\n=== Saved Commands ===");
+                for cmd in &commands {
+                    println!("\nCommand: {}", cmd.command);
+                    println!("Directory: {}", cmd.working_directory);
+                    println!("ID: {}", cmd.get_id());
+                }
+                println!("\nTotal: {} command(s)\n", commands.len());
+            }
+            return Ok(());
+        } else if let Some(id) = matches.get_one::<String>("delete") {
+            let mut store = CommandStore::load(&storage_path)?;
+            
+            match store.delete_command(id) {
+                Ok(_) => {
+                    println!(">>> Command deleted successfully");
+                    store.save(&storage_path)?;
+                },
+                Err(e) => {
+                    eprintln!(">>> Error: {}", e);
+                }
+            }
             return Ok(());
         } else if let Some(query) = matches.get_one::<String>("query") {
-            let store = CommandStore::load(&storage_path)?;
+            let mut store = CommandStore::load(&storage_path)?;
 
-            let commands = store.search(query, None, None);
-        
-            interactively_process_commands(commands)?;
+            // Get command IDs from search results
+            let command_ids: Vec<String> = {
+                let search_results = store.search(query, None, None);
+                search_results.iter().map(|c| c.get_id().to_string()).collect()
+            };
+            
+            // Collect the commands into owned data before passing mutable reference
+            let commands_data: Vec<(String, String, String)> = command_ids.iter()
+                .filter_map(|id| {
+                    store.commands.iter()
+                        .find(|c| c.get_id() == id)
+                        .map(|c| (c.get_id().to_string(), c.command.clone(), c.working_directory.clone()))
+                })
+                .collect();
+            
+            if commands_data.is_empty() {
+                println!("No commands found matching '{}'", query);
+                return Ok(());
+            }
+            
+            // Interactive selection
+            terminal::enable_raw_mode()?;
+            let mut stdout = stdout();
+            let mut selected = 0;
+
+            loop {
+                // Clear screen and reset cursor
+                queue!(
+                    stdout,
+                    Clear(ClearType::All),
+                    MoveTo(0, 0),
+                    Hide
+                )?;
+
+                // Display commands
+                for (i, (_, cmd, _)) in commands_data.iter().enumerate() {
+                    let prefix = if i == selected { "> " } else { "  " };
+                    let number = format!("{}. ", i + 1);
+                    
+                    queue!(
+                        stdout,
+                        MoveTo(0, i as u16),
+                        Clear(ClearType::CurrentLine),
+                        Print(prefix),
+                        Print(number),
+                        Print(cmd.as_str()),
+                    )?;
+                }
+
+                queue!(
+                    stdout,
+                    MoveTo(0, commands_data.len() as u16),
+                    Print("Press 'Enter' to execute the selected command, 'Esc' to exit"),
+                    Print("\n"),
+                )?;
+                
+                stdout.flush()?;
+
+                if let Event::Key(key_event) = event::read()? {
+                    match key_event.code {
+                        KeyCode::Up => {
+                            if selected > 0 {
+                                selected -= 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if selected < commands_data.len() - 1 {
+                                selected += 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            let (cmd_id, cmd_text, cmd_dir) = &commands_data[selected];
+                            
+                            // Increment usage counter
+                            let _ = store.increment_usage(cmd_id);
+                            let _ = store.save(&storage_path);
+                            
+                            eprintln!("{};{}", cmd_dir, cmd_text);
+                            break;
+                        }
+                        KeyCode::Esc => {
+                            queue!(
+                                stdout,
+                                MoveTo(0, (commands_data.len() + 1) as u16),
+                                Clear(ClearType::CurrentLine),
+                            )?;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Disable raw mode and show cursor
+            terminal::disable_raw_mode()?;
+            execute!(stdout, Show)?;
         }
     } else {
         println!("Could not determine home directory.");
@@ -133,7 +275,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn interactively_process_commands(commands: Vec<&ops::Command>) -> Result<()> {
+fn interactively_process_commands(commands: Vec<&ops::Command>, store: &mut CommandStore, storage_path: &std::path::PathBuf) -> Result<()> {
     // Interactive command selection
     terminal::enable_raw_mode()?;
     let mut stdout = stdout();
@@ -190,6 +332,12 @@ fn interactively_process_commands(commands: Vec<&ops::Command>) -> Result<()> {
                     let cmd = &commands[selected];
                     let cmd_text = cmd.command.as_str();
                     let cmd_dir = cmd.working_directory.as_str();
+                    let cmd_id = cmd.get_id();
+                    
+                    // Increment usage counter
+                    let _ = store.increment_usage(cmd_id);
+                    let _ = store.save(storage_path);
+                    
                     eprintln!("{};{}", cmd_dir, cmd_text);
                     break;
                 }
