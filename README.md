@@ -39,14 +39,27 @@ komando --help
 
 # Build from Source
 
-## Standard Build (Recommended)
+## Quick Install (Recommended)
+Use the install script that builds and installs automatically:
+
+```bash
+# Standard build (fast pattern matching)
+./install.sh
+
+# Or with semantic embeddings (AI-powered search)
+./install.sh --embeddings
+```
+
+## Manual Build
+
+### Standard Build
 Uses fast SQL pattern matching (LIKE queries) - works on any system:
 ```bash
 cargo build --release
 sudo cp target/release/komando_exec /usr/local/bin/
 ```
 
-## Build with Semantic Embeddings
+### Build with Semantic Embeddings
 Enables AI-powered semantic search using vector embeddings:
 
 **Requirements:**

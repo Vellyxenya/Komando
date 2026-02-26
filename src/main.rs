@@ -30,21 +30,17 @@ fn get_last_commands(count: usize) -> Vec<String> {
         return Vec::new();
     };
 
-    // Process the commands
+    // Process the commands - fc -ln output has no line numbers, just commands
     content
         .lines()
         .filter(|line| !line.trim().is_empty())
         .filter_map(|line| {
-            let parts: Vec<&str> = line.trim().splitn(2, ' ').collect();
-            if parts.len() == 2 {
-                let cmd = parts[1].trim();
-                if !cmd.is_empty() && 
-                   !cmd.starts_with("history") && 
-                   !cmd.starts_with("komando") {
-                    Some(cmd.to_string())
-                } else {
-                    None
-                }
+            let cmd = line.trim();
+            if !cmd.is_empty() && 
+               !cmd.starts_with("history") && 
+               !cmd.starts_with("komando") &&
+               !cmd.contains("komando_exec") {
+                Some(cmd.to_string())
             } else {
                 None
             }
@@ -295,94 +291,6 @@ fn main() -> Result<()> {
         // Exit early if we can't determine the home directory
         return Ok(());
     }
-
-    Ok(())
-}
-
-#[allow(dead_code)]
-fn interactively_process_commands(commands: Vec<&ops::Command>, store: &mut CommandStore, storage_path: &std::path::PathBuf) -> Result<()> {
-    // Interactive command selection
-    terminal::enable_raw_mode()?;
-        #[allow(dead_code)]
-    let mut stdout = stdout();
-    let mut selected = 0;
-
-    loop {
-        // Clear screen and reset cursor
-        queue!(
-            stdout,
-            Clear(ClearType::All),
-            MoveTo(0, 0),
-            Hide  // Hide cursor while displaying menu
-        )?;
-
-        // Display commands with proper formatting
-        for (i, cmd) in commands.iter().enumerate() {
-            let prefix = if i == selected { "> " } else { "  " };
-            let number = format!("{}. ", i + 1);
-            
-            // Clear the entire line first
-            queue!(
-                stdout,
-                MoveTo(0, i as u16),
-                Clear(ClearType::CurrentLine),
-                Print(prefix),
-                Print(number),
-                Print(cmd.command.as_str()),
-            )?;
-        }
-
-        queue!(
-            stdout,
-            MoveTo(0, commands.len() as u16),
-            Print("Press 'Enter' to execute the selected command, 'Esc' to exit"),
-            Print("\n"),
-        )?;
-        
-        // Make sure to flush the output
-        stdout.flush()?;
-
-        if let Event::Key(key_event) = event::read()? {
-            match key_event.code {
-                KeyCode::Up => {
-                    if selected > 0 {
-                        selected -= 1;
-                    }
-                }
-                KeyCode::Down => {
-                    if selected < commands.len() - 1 {
-                        selected += 1;
-                    }
-                }
-                KeyCode::Enter => {
-                    let cmd = &commands[selected];
-                    let cmd_text = cmd.command.as_str();
-                    let cmd_dir = cmd.working_directory.as_str();
-                    let cmd_id = cmd.get_id();
-                    
-                    // Increment usage counter
-                    let _ = store.increment_usage(cmd_id);
-                    let _ = store.save(storage_path);
-                    
-                    eprintln!("{};{}", cmd_dir, cmd_text);
-                    break;
-                }
-                KeyCode::Esc => {
-                    queue!(
-                        stdout,
-                        MoveTo(0, (commands.len() + 1) as u16),
-                        Clear(ClearType::CurrentLine),
-                    )?;
-                    break;
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Disable raw mode and show the cursor again
-    terminal::disable_raw_mode()?;
-    execute!(stdout, Show)?;
 
     Ok(())
 }
