@@ -30,6 +30,7 @@ impl Db {
                 id TEXT PRIMARY KEY,
                 cmd TEXT NOT NULL,
                 description TEXT,
+                working_directory TEXT,
                 created_at TEXT NOT NULL
             )",
             [],
@@ -107,8 +108,8 @@ impl Db {
              FROM cmd_embeddings e
              JOIN commands c ON c.id = e.cmd_id
              WHERE e.embedding MATCH ?1 
-             ORDER BY e.distance 
-             LIMIT ?2"
+               AND k = ?2
+             ORDER BY e.distance"
         )?;
 
         let rows = stmt.query_map(params![embedding_bytes, limit as i64], |row| {
