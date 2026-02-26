@@ -2,16 +2,21 @@ use clap::{Command as ClapCommand, Arg};
 use crossterm::{
     cursor::{Hide, MoveTo, Show}, event::{self, Event, KeyCode}, execute, queue, style::Print, terminal::{self, Clear, ClearType}
 };
-use std::fs::{self, File};
-use std::io::Write;
+use std::fs;
 use std::env;
 use dirs::home_dir;
-use std::io::stdout;
+use std::io::{stdout, Write};
 use anyhow::Result;
+use uuid;
 
 mod ops;
+mod db;
 
 use ops::CommandStore;
+use db::Db;
+
+#[cfg(feature = "embeddings")]
+use db::Embedder;
 
 
 
@@ -25,21 +30,17 @@ fn get_last_commands(count: usize) -> Vec<String> {
         return Vec::new();
     };
 
-    // Process the commands
+    // Process the commands - fc -ln output has no line numbers, just commands
     content
         .lines()
         .filter(|line| !line.trim().is_empty())
         .filter_map(|line| {
-            let parts: Vec<&str> = line.trim().splitn(2, ' ').collect();
-            if parts.len() == 2 {
-                let cmd = parts[1].trim();
-                if !cmd.is_empty() && 
-                   !cmd.starts_with("history") && 
-                   !cmd.starts_with("komando") {
-                    Some(cmd.to_string())
-                } else {
-                    None
-                }
+            let cmd = line.trim();
+            if !cmd.is_empty() && 
+               !cmd.starts_with("history") && 
+               !cmd.starts_with("komando") &&
+               !cmd.contains("komando_exec") {
+                Some(cmd.to_string())
             } else {
                 None
             }
@@ -95,96 +96,119 @@ fn main() -> Result<()> {
                 .value_parser(clap::value_parser!(usize))
                 .default_value("5"),
         )
+        .arg(
+            Arg::new("init")
+                .long("init")
+                .help("Initialize shell integration")
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
 
     let count = matches.get_one::<usize>("count").copied().unwrap_or(5);
     let last_commands = get_last_commands(count);
 
-    // If the storage file does not exist, create it:
     if let Some(home_path) = home_dir() {
-        let storage_path = home_path.join(".komando.json");
-        if !storage_path.exists() {
-            let mut file = File::create(&storage_path)?;
-            file.write_all(b"")?;
+        if matches.get_flag("init") {
+            println!("alias komando='eval \"$(komando_exec --query \\\"$@\\\")\"'");
+            return Ok(());
+        }
+
+        let db_path = home_path.join(".komando.db");
+        let json_path = home_path.join(".komando.json");
+        
+        let db = Db::new(&db_path)?;
+
+        // Migration logic
+        #[cfg(feature = "embeddings")]
+        let mut embedder = Embedder::new()?;
+
+        if json_path.exists() {
+            if let Ok(store) = CommandStore::load(&json_path) {
+                println!("Migrating commands from JSON to SQLite...");
+                for cmd in store.list_all() {
+                    #[cfg(feature = "embeddings")]
+                    {
+                        if let Ok(embedding) = embedder.embed(&cmd.command) {
+                            let _ = db.insert_command(cmd.get_id(), &cmd.command, None, Some(&cmd.working_directory), &embedding);
+                        }
+                    }
+                    #[cfg(not(feature = "embeddings"))]
+                    {
+                        let _ = db.insert_command(cmd.get_id(), &cmd.command, None, Some(&cmd.working_directory));
+                    }
+                }
+                // Rename the old file so we don't migrate again
+                let _ = fs::rename(&json_path, home_path.join(".komando.json.bak"));
+                println!("Migration complete.");
+            }
         }
 
         let current_dir = env::current_dir()?;
 
         if matches.get_flag("save") {
-            //Get the last command:
-            let last_command = last_commands.first().unwrap();           
-
-            let mut store = CommandStore::load(&storage_path)?;
-
-            let working_dir = current_dir.to_str().unwrap();
-
-            // Add a new command
-            match store.add_command(
-                last_command.to_string(),
-                working_dir.to_string(),
-                "default_group".to_string(),
-                ["default_tag"].iter().map(|&s| s.to_string()).collect(),
-                Some("".to_string()),
-            ) {
-                Ok(_) => {
-                    println!(">>> Saved command: {} at {}", last_command, working_dir);
-                    store.save(&storage_path)?;
-                },
-                Err(e) => {
-                    eprintln!(">>> Warning: {}", e);
-                    // Don't save if it's a duplicate
+            // Get the last command:
+            let last_command = last_commands.first();
+            if let Some(last_command) = last_command {
+                let working_dir = current_dir.to_str().unwrap();
+                let id = uuid::Uuid::new_v4().to_string();
+                
+                #[cfg(feature = "embeddings")]
+                {
+                    match embedder.embed(last_command) {
+                        Ok(embedding) => {
+                            match db.insert_command(&id, last_command, None, Some(working_dir), &embedding) {
+                                Ok(_) => println!(">>> Saved command: {} at {}", last_command, working_dir),
+                                Err(e) => eprintln!(">>> Error saving command: {}", e),
+                            }
+                        },
+                        Err(e) => eprintln!(">>> Error generating embedding: {}", e),
+                    }
                 }
+                #[cfg(not(feature = "embeddings"))]
+                {
+                    match db.insert_command(&id, last_command, None, Some(working_dir)) {
+                        Ok(_) => println!(">>> Saved command: {} at {}", last_command, working_dir),
+                        Err(e) => eprintln!(">>> Error saving command: {}", e),
+                    }
+                }
+            } else {
+                eprintln!(">>> Error: No last command found to save. Please ensure /tmp/last_commands.txt contains valid command history.");
             }
-
             return Ok(());
         } else if matches.get_flag("list") {
-            let store = CommandStore::load(&storage_path)?;
-            let commands = store.list_all();
+            let commands = db.get_all_commands()?;
             
             if commands.is_empty() {
                 println!("No saved commands found.");
             } else {
                 println!("\n=== Saved Commands ===");
-                for cmd in &commands {
-                    println!("\nCommand: {}", cmd.command);
-                    println!("Directory: {}", cmd.working_directory);
-                    println!("ID: {}", cmd.get_id());
+                for (id, cmd) in &commands {
+                    println!("\nCommand: {}", cmd);
+                    println!("ID: {}", id);
                 }
                 println!("\nTotal: {} command(s)\n", commands.len());
             }
             return Ok(());
         } else if let Some(id) = matches.get_one::<String>("delete") {
-            let mut store = CommandStore::load(&storage_path)?;
-            
-            match store.delete_command(id) {
-                Ok(_) => {
-                    println!(">>> Command deleted successfully");
-                    store.save(&storage_path)?;
-                },
-                Err(e) => {
-                    eprintln!(">>> Error: {}", e);
-                }
+            match db.delete_command(id) {
+                Ok(_) => println!(">>> Command deleted successfully"),
+                Err(e) => eprintln!(">>> Error: {}", e),
             }
             return Ok(());
         } else if let Some(query) = matches.get_one::<String>("query") {
-            let mut store = CommandStore::load(&storage_path)?;
-
-            // Get command IDs from search results
-            let command_ids: Vec<String> = {
-                let search_results = store.search(query, None, None);
-                search_results.iter().map(|c| c.get_id().to_string()).collect()
+            #[cfg(feature = "embeddings")]
+            let search_results = {
+                let query_embedding = embedder.embed(query)?;
+                db.search_commands(&query_embedding, 10)?
+                    .into_iter()
+                    .map(|(id, cmd, _dist)| (id, cmd))
+                    .collect::<Vec<_>>()
             };
             
-            // Collect the commands into owned data before passing mutable reference
-            let commands_data: Vec<(String, String, String)> = command_ids.iter()
-                .filter_map(|id| {
-                    store.commands.iter()
-                        .find(|c| c.get_id() == id)
-                        .map(|c| (c.get_id().to_string(), c.command.clone(), c.working_directory.clone()))
-                })
-                .collect();
+            #[cfg(not(feature = "embeddings"))]
+            let search_results = db.search_commands(query, 10)?;
             
-            if commands_data.is_empty() {
+            if search_results.is_empty() {
                 println!("No commands found matching '{}'", query);
                 return Ok(());
             }
@@ -204,7 +228,7 @@ fn main() -> Result<()> {
                 )?;
 
                 // Display commands
-                for (i, (_, cmd, _)) in commands_data.iter().enumerate() {
+                for (i, (_, cmd)) in search_results.iter().enumerate() {
                     let prefix = if i == selected { "> " } else { "  " };
                     let number = format!("{}. ", i + 1);
                     
@@ -220,7 +244,7 @@ fn main() -> Result<()> {
 
                 queue!(
                     stdout,
-                    MoveTo(0, commands_data.len() as u16),
+                    MoveTo(0, search_results.len() as u16),
                     Print("Press 'Enter' to execute the selected command, 'Esc' to exit"),
                     Print("\n"),
                 )?;
@@ -235,24 +259,20 @@ fn main() -> Result<()> {
                             }
                         }
                         KeyCode::Down => {
-                            if selected < commands_data.len() - 1 {
+                            if selected < search_results.len() - 1 {
                                 selected += 1;
                             }
                         }
                         KeyCode::Enter => {
-                            let (cmd_id, cmd_text, cmd_dir) = &commands_data[selected];
+                            let (_, cmd_text) = &search_results[selected];
                             
-                            // Increment usage counter
-                            let _ = store.increment_usage(cmd_id);
-                            let _ = store.save(&storage_path);
-                            
-                            eprintln!("{};{}", cmd_dir, cmd_text);
+                            eprintln!("{}", cmd_text);
                             break;
                         }
                         KeyCode::Esc => {
                             queue!(
                                 stdout,
-                                MoveTo(0, (commands_data.len() + 1) as u16),
+                                MoveTo(0, (search_results.len() + 1) as u16),
                                 Clear(ClearType::CurrentLine),
                             )?;
                             break;
@@ -271,92 +291,6 @@ fn main() -> Result<()> {
         // Exit early if we can't determine the home directory
         return Ok(());
     }
-
-    Ok(())
-}
-
-fn interactively_process_commands(commands: Vec<&ops::Command>, store: &mut CommandStore, storage_path: &std::path::PathBuf) -> Result<()> {
-    // Interactive command selection
-    terminal::enable_raw_mode()?;
-    let mut stdout = stdout();
-    let mut selected = 0;
-
-    loop {
-        // Clear screen and reset cursor
-        queue!(
-            stdout,
-            Clear(ClearType::All),
-            MoveTo(0, 0),
-            Hide  // Hide cursor while displaying menu
-        )?;
-
-        // Display commands with proper formatting
-        for (i, cmd) in commands.iter().enumerate() {
-            let prefix = if i == selected { "> " } else { "  " };
-            let number = format!("{}. ", i + 1);
-            
-            // Clear the entire line first
-            queue!(
-                stdout,
-                MoveTo(0, i as u16),
-                Clear(ClearType::CurrentLine),
-                Print(prefix),
-                Print(number),
-                Print(cmd.command.as_str()),
-            )?;
-        }
-
-        queue!(
-            stdout,
-            MoveTo(0, commands.len() as u16),
-            Print("Press 'Enter' to execute the selected command, 'Esc' to exit"),
-            Print("\n"),
-        )?;
-        
-        // Make sure to flush the output
-        stdout.flush()?;
-
-        if let Event::Key(key_event) = event::read()? {
-            match key_event.code {
-                KeyCode::Up => {
-                    if selected > 0 {
-                        selected -= 1;
-                    }
-                }
-                KeyCode::Down => {
-                    if selected < commands.len() - 1 {
-                        selected += 1;
-                    }
-                }
-                KeyCode::Enter => {
-                    let cmd = &commands[selected];
-                    let cmd_text = cmd.command.as_str();
-                    let cmd_dir = cmd.working_directory.as_str();
-                    let cmd_id = cmd.get_id();
-                    
-                    // Increment usage counter
-                    let _ = store.increment_usage(cmd_id);
-                    let _ = store.save(storage_path);
-                    
-                    eprintln!("{};{}", cmd_dir, cmd_text);
-                    break;
-                }
-                KeyCode::Esc => {
-                    queue!(
-                        stdout,
-                        MoveTo(0, (commands.len() + 1) as u16),
-                        Clear(ClearType::CurrentLine),
-                    )?;
-                    break;
-                }
-                _ => {}
-            }
-        }
-    }
-
-    // Disable raw mode and show the cursor again
-    terminal::disable_raw_mode()?;
-    execute!(stdout, Show)?;
 
     Ok(())
 }

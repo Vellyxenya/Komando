@@ -7,7 +7,8 @@ use std::io::{self, Write};
 
 const SHELL_FUNCTION: &str = r#"
 komando() {
-    history > /tmp/last_commands.txt
+    # Capture recent history using fc (works in bash and zsh)
+    fc -ln -50 -1 | sed 's/^[[:space:]]*//' > /tmp/last_commands.txt
     RUST_PROGRAM="komando_exec"
     if command -v "$RUST_PROGRAM" > /dev/null 2>&1; then
         OUTPUT=$("$RUST_PROGRAM" "$@" 2>&1 1>/dev/tty)
