@@ -110,6 +110,7 @@ impl CommandStore {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn update_command(&mut self, id: &str, updates: CommandUpdates) -> Result<()> {
         // First find the command and apply updates
         if let Some(cmd) = self.commands.iter_mut().find(|c| c.id == id) {
@@ -182,6 +183,7 @@ impl CommandStore {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct CommandUpdates {
     command: Option<String>,
     group: Option<String>,
