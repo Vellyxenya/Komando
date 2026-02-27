@@ -178,6 +178,39 @@ cargo test --all-features     # With embeddings
 3. Address review feedback
 4. Squash commits before merge (optional)
 
+## Release Process (Maintainers Only)
+
+Komando uses [cargo-release](https://github.com/crate-ci/cargo-release) for automated releases:
+
+**Single Source of Truth:** Version is only defined in `Cargo.toml`. cargo-release handles creating matching git tags automatically.
+
+### Steps to Release
+
+1. **Update CHANGELOG.md**: Add changes under `[Unreleased]` section
+
+2. **Run cargo-release**:
+   ```bash
+   # Dry run first
+   cargo release --dry-run
+   
+   # Then release (examples)
+   cargo release patch              # 0.1.1 -> 0.1.2
+   cargo release minor              # 0.1.1 -> 0.2.0
+   cargo release major              # 0.1.1 -> 1.0.0
+   cargo release --pre-release alpha # 0.1.1 -> 0.2.0-alpha.1
+   ```
+
+3. **Automated CI/CD**: GitHub Actions automatically:
+   - Builds binaries for all platforms
+   - Creates GitHub Release
+   - Publishes to crates.io
+
+**No Manual Steps Required!** cargo-release handles:
+- ✅ Version bump in Cargo.toml
+- ✅ CHANGELOG.md updates
+- ✅ Git commit and tag creation
+- ✅ Pushing to GitHub
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
