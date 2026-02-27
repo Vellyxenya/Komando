@@ -275,67 +275,39 @@ cargo check --all-targets --all-features
 
 ## Release Process
 
-This project uses [cargo-release](https://github.com/crate-ci/cargo-release) with a custom workflow that respects branch protection rules.
+This project uses an automated release script that handles version bumping and release workflow.
 
-### Making a Release (Automated)
+### Making a Release
 
-**Use the release script** (recommended):
+**Use the release script**:
 
 ```bash
-# Preview changes (dry-run)
-./scripts/release.sh alpha --dry-run
-
-# Execute release
 ./scripts/release.sh alpha      # 1.0.0-alpha.1 -> 1.0.0-alpha.2
-./scripts/release.sh beta       # 1.0.0-alpha.1 -> 1.0.0-beta.1
-./scripts/release.sh rc         # 1.0.0-beta.1 -> 1.0.0-rc.1
-./scripts/release.sh release    # 1.0.0-rc.1 -> 1.0.0
 ./scripts/release.sh patch      # 1.0.0 -> 1.0.1
 ./scripts/release.sh minor      # 1.0.0 -> 1.1.0
 ./scripts/release.sh major      # 1.0.0 -> 2.0.0
 ```
 
 The script will:
-1. ✅ Run cargo-release (runs tests, updates version, creates commit & tag)
-2. ✅ Create a release branch (e.g., `release/v1.0.0-alpha.2`)
-3. ✅ Push the branch and tag to GitHub
-4. ✅ Show you the PR URL to create
+1. ✅ Bump version in Cargo.toml
+2. ✅ Update Cargo.lock
+3. ✅ Run all tests
+4. ✅ Create release commit
+5. ✅ Create version tag
+6. ✅ Push release branch to GitHub
+7. ✅ Push tag (triggers release workflow)
+8. ✅ Show you the PR URL
 
-### Making a Release (Manual)
+### What Happens Next
 
-If you prefer manual control:
+After running the script:
 
-1. **Update CHANGELOG.md**: Add changes under `[Unreleased]` section
-
-2. **Run cargo-release**:
-   ```bash
-   cargo install cargo-release  # One-time setup
-   
-   # Preview changes
-   cargo release alpha
-   
-   # Execute release
-   cargo release alpha -x
-   ```
-
-3. **Create and push release branch**:
-   ```bash
-   VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
-   git branch release/v$VERSION
-   git push origin release/v$VERSION
-   git push origin v$VERSION
-   ```
-
-4. **Create PR**: `release/v{version}` → `master`
-
-5. **After PR is merged**: GitHub Actions automatically builds and publishes
-
-### What Happens Automatically
-
-When you push the tag, **GitHub Actions** will:
-- Build binaries for Linux and macOS (x86_64 and ARM64)
-- Create a GitHub Release with binaries
-- Publish to crates.io
+1. **Create a PR**: `release/v{version}` → `master` using the URL provided
+2. **Review and merge** the PR
+3. **GitHub Actions automatically**:
+   - Builds binaries for Linux and macOS (x86_64 and ARM64)
+   - Creates a GitHub Release with binaries
+   - Publishes to crates.io
 
 ### Configuration
 
