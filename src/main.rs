@@ -1,29 +1,30 @@
-use clap::{Command as ClapCommand, Arg};
-use crossterm::{
-    cursor::{Hide, MoveTo, Show}, event::{self, Event, KeyCode}, execute, queue, style::Print, terminal::{self, Clear, ClearType}
-};
-use std::fs;
-use std::env;
-use dirs::home_dir;
-use std::io::{stdout, Write};
 use anyhow::Result;
+use clap::{Arg, Command as ClapCommand};
+use crossterm::{
+    cursor::{Hide, MoveTo, Show},
+    event::{self, Event, KeyCode},
+    execute, queue,
+    style::Print,
+    terminal::{self, Clear, ClearType},
+};
+use dirs::home_dir;
+use std::env;
+use std::fs;
+use std::io::{stdout, Write};
 use uuid;
 
-mod ops;
 mod db;
+mod ops;
 
-use ops::CommandStore;
 use db::Db;
+use ops::CommandStore;
 
 #[cfg(feature = "embeddings")]
 use db::Embedder;
 
-
-
-fn get_last_commands(count: usize) -> Vec<String> {   
-
+fn get_last_commands(count: usize) -> Vec<String> {
     let file_content = fs::read_to_string("/tmp/last_commands.txt").ok();
-    
+
     let content = if let Some(content) = file_content {
         content
     } else {
@@ -36,10 +37,11 @@ fn get_last_commands(count: usize) -> Vec<String> {
         .filter(|line| !line.trim().is_empty())
         .filter_map(|line| {
             let cmd = line.trim();
-            if !cmd.is_empty() && 
-               !cmd.starts_with("history") && 
-               !cmd.starts_with("komando") &&
-               !cmd.contains("komando_exec") {
+            if !cmd.is_empty()
+                && !cmd.starts_with("history")
+                && !cmd.starts_with("komando")
+                && !cmd.contains("komando_exec")
+            {
                 Some(cmd.to_string())
             } else {
                 None
@@ -115,7 +117,7 @@ fn main() -> Result<()> {
 
         let db_path = home_path.join(".komando.db");
         let json_path = home_path.join(".komando.json");
-        
+
         let db = Db::new(&db_path)?;
 
         // Migration logic
@@ -129,12 +131,23 @@ fn main() -> Result<()> {
                     #[cfg(feature = "embeddings")]
                     {
                         if let Ok(embedding) = embedder.embed(&cmd.command) {
-                            let _ = db.insert_command(cmd.get_id(), &cmd.command, None, Some(&cmd.working_directory), &embedding);
+                            let _ = db.insert_command(
+                                cmd.get_id(),
+                                &cmd.command,
+                                None,
+                                Some(&cmd.working_directory),
+                                &embedding,
+                            );
                         }
                     }
                     #[cfg(not(feature = "embeddings"))]
                     {
-                        let _ = db.insert_command(cmd.get_id(), &cmd.command, None, Some(&cmd.working_directory));
+                        let _ = db.insert_command(
+                            cmd.get_id(),
+                            &cmd.command,
+                            None,
+                            Some(&cmd.working_directory),
+                        );
                     }
                 }
                 // Rename the old file so we don't migrate again
@@ -151,16 +164,25 @@ fn main() -> Result<()> {
             if let Some(last_command) = last_command {
                 let working_dir = current_dir.to_str().unwrap();
                 let id = uuid::Uuid::new_v4().to_string();
-                
+
                 #[cfg(feature = "embeddings")]
                 {
                     match embedder.embed(last_command) {
                         Ok(embedding) => {
-                            match db.insert_command(&id, last_command, None, Some(working_dir), &embedding) {
-                                Ok(_) => println!(">>> Saved command: {} at {}", last_command, working_dir),
+                            match db.insert_command(
+                                &id,
+                                last_command,
+                                None,
+                                Some(working_dir),
+                                &embedding,
+                            ) {
+                                Ok(_) => println!(
+                                    ">>> Saved command: {} at {}",
+                                    last_command, working_dir
+                                ),
                                 Err(e) => eprintln!(">>> Error saving command: {}", e),
                             }
-                        },
+                        }
                         Err(e) => eprintln!(">>> Error generating embedding: {}", e),
                     }
                 }
@@ -177,7 +199,7 @@ fn main() -> Result<()> {
             return Ok(());
         } else if matches.get_flag("list") {
             let commands = db.get_all_commands()?;
-            
+
             if commands.is_empty() {
                 println!("No saved commands found.");
             } else {
@@ -204,15 +226,15 @@ fn main() -> Result<()> {
                     .map(|(id, cmd, _dist)| (id, cmd))
                     .collect::<Vec<_>>()
             };
-            
+
             #[cfg(not(feature = "embeddings"))]
             let search_results = db.search_commands(query, 10)?;
-            
+
             if search_results.is_empty() {
                 println!("No commands found matching '{}'", query);
                 return Ok(());
             }
-            
+
             // Interactive selection
             terminal::enable_raw_mode()?;
             let mut stdout = stdout();
@@ -220,18 +242,13 @@ fn main() -> Result<()> {
 
             loop {
                 // Clear screen and reset cursor
-                queue!(
-                    stdout,
-                    Clear(ClearType::All),
-                    MoveTo(0, 0),
-                    Hide
-                )?;
+                queue!(stdout, Clear(ClearType::All), MoveTo(0, 0), Hide)?;
 
                 // Display commands
                 for (i, (_, cmd)) in search_results.iter().enumerate() {
                     let prefix = if i == selected { "> " } else { "  " };
                     let number = format!("{}. ", i + 1);
-                    
+
                     queue!(
                         stdout,
                         MoveTo(0, i as u16),
@@ -248,7 +265,7 @@ fn main() -> Result<()> {
                     Print("Press 'Enter' to execute the selected command, 'Esc' to exit"),
                     Print("\n"),
                 )?;
-                
+
                 stdout.flush()?;
 
                 if let Event::Key(key_event) = event::read()? {
@@ -265,7 +282,7 @@ fn main() -> Result<()> {
                         }
                         KeyCode::Enter => {
                             let (_, cmd_text) = &search_results[selected];
-                            
+
                             eprintln!("{}", cmd_text);
                             break;
                         }
@@ -293,4 +310,92 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_last_commands_empty_file() {
+        // Create an empty temp file
+        std::fs::write("/tmp/last_commands.txt", "").unwrap();
+
+        let commands = get_last_commands(5);
+        assert_eq!(commands.len(), 0);
+    }
+
+    #[test]
+    fn test_get_last_commands_filters_correctly() {
+        // Create a temp file with test data
+        let content = r#"ls -la
+git commit -m 'test'
+history
+komando -s
+docker ps
+komando_exec --list
+kubectl get pods
+"#;
+
+        std::fs::write("/tmp/last_commands.txt", content).unwrap();
+
+        let commands = get_last_commands(10);
+
+        // Should filter out history, komando commands
+        assert!(
+            !commands.iter().any(|c| c.contains("history")),
+            "Should not include history command"
+        );
+        assert!(
+            !commands.iter().any(|c| c.contains("komando")),
+            "Should not include komando commands"
+        );
+
+        // Should include valid commands (note: commands are reversed, so latest first)
+        let all_cmds = commands.join(" ");
+        assert!(
+            all_cmds.contains("ls -la") || commands.iter().any(|c| c == "ls -la"),
+            "Should include ls -la"
+        );
+        assert!(
+            all_cmds.contains("git commit") || commands.iter().any(|c| c.contains("git commit")),
+            "Should include git commit"
+        );
+        assert!(
+            all_cmds.contains("docker ps") || commands.iter().any(|c| c == "docker ps"),
+            "Should include docker ps"
+        );
+
+        // Verify we got some commands
+        assert!(!commands.is_empty(), "Should have at least some commands");
+
+        // Clean up
+        let _ = std::fs::remove_file("/tmp/last_commands.txt");
+    }
+
+    #[test]
+    fn test_get_last_commands_respects_limit() {
+        let content = (0..20)
+            .map(|i| format!("testcmd{}", i))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        std::fs::write("/tmp/last_commands.txt", content).unwrap();
+
+        let commands = get_last_commands(5);
+        assert_eq!(commands.len(), 5, "Should return exactly 5 commands");
+
+        let commands = get_last_commands(10);
+        assert_eq!(commands.len(), 10, "Should return exactly 10 commands");
+
+        let commands = get_last_commands(100);
+        assert_eq!(
+            commands.len(),
+            20,
+            "Should return all 20 commands available"
+        );
+
+        // Clean up
+        let _ = std::fs::remove_file("/tmp/last_commands.txt");
+    }
 }

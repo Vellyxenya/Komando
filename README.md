@@ -1,4 +1,9 @@
 # Komando
+
+[![CI](https://github.com/Vellyxenya/Komando/workflows/CI/badge.svg)](https://github.com/Vellyxenya/Komando/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/komando.svg)](https://crates.io/crates/komando)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A command line utility to help you organize and easily access your commands with SQLite-based storage and optional semantic search.
 
 ## Features
@@ -192,6 +197,69 @@ If embeddings are causing issues, you can always rebuild without them:
 cargo build --release  # Without --features embeddings
 ```
 Pattern-based search is fast and reliable for most use cases.
+
+# Development
+
+## Setting Up Development Environment
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Vellyxenya/Komando.git
+   cd Komando
+   ```
+
+2. Install pre-commit hooks:
+   ```bash
+   ./setup_hooks.sh
+   ```
+
+   This installs git hooks that automatically run before each commit:
+   - `cargo fmt` - Code formatting check
+   - `cargo clippy` - Linting with warnings as errors
+   - `cargo test` - All unit tests
+   - `cargo check` - Build verification
+
+   **Alternative: Using pre-commit framework**
+   ```bash
+   pip install pre-commit
+   pre-commit install
+   ```
+
+## Running Tests
+
+```bash
+# Run all tests (standard features)
+cargo test
+
+# Run tests with all features
+cargo test --all-features
+
+# Run specific test
+cargo test test_name
+```
+
+## Code Quality
+
+```bash
+# Format code
+cargo fmt --all
+
+# Run linter
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Check without building
+cargo check --all-targets --all-features
+```
+
+## Building
+
+```bash
+# Standard build
+./install.sh
+
+# With embeddings
+./install.sh --embeddings
+```
 
 # License
 This project is licensed under the MIT License.

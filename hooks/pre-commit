@@ -1,0 +1,55 @@
+#!/bin/bash
+# Git pre-commit hook for Komando
+# This script runs before every commit to ensure code quality
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if we're in the git repository root
+if [ ! -d .git ]; then
+    echo "Error: Not in git repository root"
+    exit 1
+fi
+
+# 1. Run rustfmt
+echo ""
+echo "📝 Checking code formatting with rustfmt..."
+if ! cargo fmt --all -- --check; then
+    echo "❌ Code formatting check failed!"
+    echo "   Run: cargo fmt --all"
+    exit 1
+fi
+echo "✅ Formatting check passed"
+
+# 2. Run clippy
+echo ""
+echo "🔍 Running clippy lints..."
+if ! cargo clippy --all-targets --all-features; then
+    echo "❌ Clippy found issues!"
+    echo "   Fix warnings or run: cargo clippy --fix"
+    exit 1
+fi
+echo "✅ Clippy passed"
+
+# 3. Run tests (standard features only for speed)
+echo ""
+echo "🧪 Running tests..."
+if ! cargo test --quiet; then
+    echo "❌ Tests failed!"
+    exit 1
+fi
+echo "✅ Tests passed"
+
+# 4. Check that it builds
+echo ""
+echo "🔨 Checking build..."
+if ! cargo check --all-targets --all-features --quiet; then
+    echo "❌ Build check failed!"
+    exit 1
+fi
+echo "✅ Build check passed"
+
+echo ""
+echo "✨ All pre-commit checks passed!"
+echo ""
