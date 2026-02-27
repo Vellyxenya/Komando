@@ -18,6 +18,9 @@ ENV PATH="/home/vscode/.cargo/bin:${PATH}"
 # Pre-install some common components
 RUN rustup component add rust-analyzer rustfmt clippy
 
+# Install cargo-release for automated version management
+RUN cargo install cargo-release
+
 USER root
 # Ensure the vscode user has permissions to common cargo directories
 RUN mkdir -p /home/vscode/.cargo/registry && chown -R vscode:vscode /home/vscode/.cargo

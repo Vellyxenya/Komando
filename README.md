@@ -273,5 +273,61 @@ cargo check --all-targets --all-features
 ./install.sh --embeddings
 ```
 
+## Release Process
+
+This project uses [cargo-release](https://github.com/crate-ci/cargo-release) for automated releases with a single source of truth (Cargo.toml).
+
+### Making a Release
+
+1. **Install cargo-release** (one-time setup):
+   ```bash
+   cargo install cargo-release
+   ```
+
+2. **Update CHANGELOG.md**:
+   - Add changes under the `[Unreleased]` section
+   - cargo-release will automatically create a version section
+
+3. **Run cargo release**:
+   ```bash
+   # Dry run to preview changes
+   cargo release --dry-run
+   
+   # Patch release (0.1.1 -> 0.1.2)
+   cargo release patch
+   
+   # Minor release (0.1.1 -> 0.2.0)
+   cargo release minor
+   
+   # Major release (0.1.1 -> 1.0.0)
+   cargo release major
+   
+   # Pre-release (alpha, beta, rc)
+   cargo release --pre-release alpha
+   cargo release --pre-release beta
+   cargo release --pre-release rc
+   ```
+
+4. **cargo-release will**:
+   - Run tests to ensure everything works
+   - Update version in Cargo.toml
+   - Update CHANGELOG.md with the version and date
+   - Create a commit with message: `chore: release komando v{version}`
+   - Create a git tag: `v{version}`
+   - Push commit and tag to GitHub
+
+5. **GitHub Actions automatically**:
+   - Builds binaries for Linux and macOS (x86_64 and ARM64)
+   - Creates a GitHub Release with binaries attached
+   - Publishes to crates.io
+
+### Configuration
+
+Release behavior is configured in [release.toml](release.toml). Key settings:
+- Pre-release hooks run tests before releasing
+- Automatic tag creation with `v` prefix
+- CHANGELOG.md updates
+- Sign commits/tags (optional)
+
 # License
 This project is licensed under the MIT License.

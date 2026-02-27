@@ -12,31 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-      
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
-
-  build-and-upload:
-    name: Build and Upload
-    needs: create-release
+  build-and-release:
+    name: Build and Release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -72,18 +49,16 @@ jobs:
           mv ${{ matrix.asset_name }}.tar.gz ../../..
       
       - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}.tar.gz
-          asset_name: ${{ matrix.asset_name }}.tar.gz
-          asset_content_type: application/gzip
+          files: ${{ matrix.asset_name }}.tar.gz
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
 
   publish-crates-io:
     name: Publish to crates.io
-    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -91,8 +66,5 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       
-      - name: Login to crates.io
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      
       - name: Publish to crates.io
-        run: cargo publish --allow-dirty
+        run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}

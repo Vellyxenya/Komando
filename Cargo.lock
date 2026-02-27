@@ -1069,7 +1069,7 @@ dependencies = [
 
 [[package]]
 name = "komando"
-version = "0.1.1"
+version = "1.0.0-alpha.1"
 dependencies = [
  "anyhow",
  "chrono",
