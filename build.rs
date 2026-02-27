@@ -67,7 +67,10 @@ fn setup_shell_integration() -> std::io::Result<()> {
     }
 
     // Add shell function to rc file
-    let mut file = fs::OpenOptions::new().append(true).open(rc_file)?;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(rc_file)?;
     writeln!(file, "\n# Komando shell integration")?;
     writeln!(file, "{}", SHELL_FUNCTION)?;
     println!("cargo:warning=Shell integration installed. Please restart your shell or run 'source ~/.bashrc' (or ~/.zshrc)");
