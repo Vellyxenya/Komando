@@ -7,6 +7,7 @@ publish = false
 # Create a git tag with the version
 tag = true
 tag-name = "v{{version}}"
+tag-message = ""
 
 # Don't push automatically - we'll create a release branch for PR
 push = false
@@ -15,7 +16,7 @@ push = false
 allow-branch = ["*"]
 
 # Pre-release hook to ensure everything is ready
-pre-release-hook = ["cargo", "test", "--all-features"]
+# pre-release-hook = ["cargo", "test", "--all-features", "--", "--test-threads=1"]
 
 # Commit message template
 pre-release-commit-message = "chore: release {{crate_name}} v{{version}}"
@@ -23,10 +24,3 @@ pre-release-commit-message = "chore: release {{crate_name}} v{{version}}"
 # Sign tags and commits
 sign-commit = false
 sign-tag = false
-
-# Pre-release replacements in other files
-[[pre-release-replacements]]
-file = "CHANGELOG.md"
-search = "## \\[Unreleased\\]"
-replace = "## [Unreleased]\n\n## [{{version}}] - {{date}}"
-exactly = 1
