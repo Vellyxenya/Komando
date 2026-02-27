@@ -77,7 +77,15 @@ if [ -n "$DRY_RUN" ]; then
     exit 0
 else
     info "Running cargo release $RELEASE_TYPE..."
-    cargo release "$RELEASE_TYPE" -x --verbose || error "cargo release failed"
+    echo ""
+    info "This will:"
+    echo "  1. Run all tests (--test-threads=1)"
+    echo "  2. Update Cargo.toml version"
+    echo "  3. Update CHANGELOG.md"
+    echo "  4. Create a git commit"
+    echo "  5. Create a git tag"
+    echo ""
+    cargo release "$RELEASE_TYPE" -x --no-confirm --verbose || error "cargo release failed"
     success "cargo-release completed"
 fi
 
