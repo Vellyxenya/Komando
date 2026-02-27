@@ -77,7 +77,7 @@ if [ -n "$DRY_RUN" ]; then
     exit 0
 else
     info "Running cargo release $RELEASE_TYPE..."
-    cargo release "$RELEASE_TYPE" -x || error "cargo release failed"
+    cargo release "$RELEASE_TYPE" -x --verbose || error "cargo release failed"
     success "cargo-release completed"
 fi
 
