@@ -7,6 +7,7 @@ publish = false
 # Create a git tag with the version
 tag = true
 tag-name = "v{{version}}"
+tag-message = ""
 
 # Don't push automatically - we'll create a release branch for PR
 push = false
