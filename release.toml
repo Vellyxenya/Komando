@@ -8,12 +8,11 @@ publish = false
 tag = true
 tag-name = "v{{version}}"
 
-# Push to git remote
-push = true
-push-remote = "origin"
+# Don't push automatically - we'll create a release branch for PR
+push = false
 
-# Allow dirty working directory (in case of CI artifacts)
-allow-branch = ["master", "main"]
+# Allow any branch for releases (we'll create feature branches)
+allow-branch = ["*"]
 
 # Pre-release hook to ensure everything is ready
 pre-release-hook = ["cargo", "test", "--all-features"]
