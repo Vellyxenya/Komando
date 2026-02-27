@@ -275,63 +275,71 @@ cargo check --all-targets --all-features
 
 ## Release Process
 
-This project uses [cargo-release](https://github.com/crate-ci/cargo-release) for automated releases with a single source of truth (Cargo.toml).
+This project uses [cargo-release](https://github.com/crate-ci/cargo-release) with a custom workflow that respects branch protection rules.
 
-### Making a Release
+### Making a Release (Automated)
 
-1. **Install cargo-release** (one-time setup):
+**Use the release script** (recommended):
+
+```bash
+# Preview changes (dry-run)
+./scripts/release.sh alpha --dry-run
+
+# Execute release
+./scripts/release.sh alpha      # 1.0.0-alpha.1 -> 1.0.0-alpha.2
+./scripts/release.sh beta       # 1.0.0-alpha.1 -> 1.0.0-beta.1
+./scripts/release.sh rc         # 1.0.0-beta.1 -> 1.0.0-rc.1
+./scripts/release.sh release    # 1.0.0-rc.1 -> 1.0.0
+./scripts/release.sh patch      # 1.0.0 -> 1.0.1
+./scripts/release.sh minor      # 1.0.0 -> 1.1.0
+./scripts/release.sh major      # 1.0.0 -> 2.0.0
+```
+
+The script will:
+1. ✅ Run cargo-release (runs tests, updates version, creates commit & tag)
+2. ✅ Create a release branch (e.g., `release/v1.0.0-alpha.2`)
+3. ✅ Push the branch and tag to GitHub
+4. ✅ Show you the PR URL to create
+
+### Making a Release (Manual)
+
+If you prefer manual control:
+
+1. **Update CHANGELOG.md**: Add changes under `[Unreleased]` section
+
+2. **Run cargo-release**:
    ```bash
-   cargo install cargo-release
+   cargo install cargo-release  # One-time setup
+   
+   # Preview changes
+   cargo release alpha
+   
+   # Execute release
+   cargo release alpha -x
    ```
 
-2. **Update CHANGELOG.md**:
-   - Add changes under the `[Unreleased]` section
-   - cargo-release will automatically create a version section
-
-3. **Run cargo release**:
+3. **Create and push release branch**:
    ```bash
-   # Dry run to preview changes (default)
-   cargo release
-   
-   # Patch release (0.1.1 -> 0.1.2)
-   cargo release patch -x
-   
-   # Minor release (0.1.1 -> 0.2.0)
-   cargo release minor -x
-   
-   # Major release (0.1.1 -> 1.0.0)
-   cargo release major -x
-   
-   # Pre-release (alpha, beta, rc)
-   cargo release alpha -x     # 1.0.0-alpha.1 -> 1.0.0-alpha.2
-   cargo release beta -x      # 1.0.0-alpha.1 -> 1.0.0-beta.1
-   cargo release rc -x        # 1.0.0-beta.1 -> 1.0.0-rc.1
-   cargo release release -x   # 1.0.0-rc.1 -> 1.0.0
-   
-   # Note: -x flag is required to actually execute the release
-   # Without it, cargo-release runs in dry-run mode
+   VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+   git branch release/v$VERSION
+   git push origin release/v$VERSION
+   git push origin v$VERSION
    ```
 
-4. **cargo-release will**:
-   - Run tests to ensure everything works
-   - Update version in Cargo.toml
-   - Update CHANGELOG.md with the version and date
-   - Create a commit with message: `chore: release komando v{version}`
-   - Create a git tag: `v{version}`
-   - Push commit and tag to GitHub
+4. **Create PR**: `release/v{version}` → `master`
 
-5. **GitHub Actions automatically**:
-   - Builds binaries for Linux and macOS (x86_64 and ARM64)
-   - Creates a GitHub Release with binaries attached
-   - Publishes to crates.io
+5. **After PR is merged**: GitHub Actions automatically builds and publishes
+
+### What Happens Automatically
+
+When you push the tag, **GitHub Actions** will:
+- Build binaries for Linux and macOS (x86_64 and ARM64)
+- Create a GitHub Release with binaries
+- Publish to crates.io
 
 ### Configuration
 
-Release behavior is configured in [release.toml](release.toml). Key settings:
-- Pre-release hooks run tests before releasing
-- Automatic tag creation with `v` prefix
-- CHANGELOG.md updates
-- Sign commits/tags (optional)
+Release behavior is configured in [release.toml](release.toml). The workflow is designed to work with branch protection rules - releases go through the normal PR review process.
 
 # License
 This project is licensed under the MIT License.
