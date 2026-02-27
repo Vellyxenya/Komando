@@ -180,72 +180,47 @@ cargo test --all-features     # With embeddings
 
 ## Release Process (Maintainers Only)
 
-Komando uses [cargo-release](https://github.com/crate-ci/cargo-release) with a custom workflow that respects branch protection rules.
+Komando uses an automated release script for version management.
 
-**Single Source of Truth:** Version is only defined in `Cargo.toml`. cargo-release handles version bumps and git tags automatically.
+**Single Source of Truth:** Version is only defined in `Cargo.toml`.
 
-### Quick Release (Recommended)
+### Quick Release
 
 Use the automated release script:
 
 ```bash
-# Preview changes first
-./scripts/release.sh alpha --dry-run
-
-# Execute release
 ./scripts/release.sh alpha      # 1.0.0-alpha.1 -> 1.0.0-alpha.2
-./scripts/release.sh beta       # Move to beta
-./scripts/release.sh rc         # Move to release candidate
-./scripts/release.sh release    # Final release (removes pre-release)
-./scripts/release.sh patch      # Bug fix release
-./scripts/release.sh minor      # New feature release
-./scripts/release.sh major      # Breaking changes release
+./scripts/release.sh patch      # Bug fix release (1.0.0 -> 1.0.1)
+./scripts/release.sh minor      # New feature release (1.0.0 -> 1.1.0)
+./scripts/release.sh major      # Breaking changes release (1.0.0 -> 2.0.0)
 ```
 
 **The script handles everything:**
-1. ✅ Runs tests via cargo-release
-2. ✅ Updates Cargo.toml version
-3. ✅ Updates CHANGELOG.md
-4. ✅ Creates commit and tag locally
-5. ✅ Creates a release branch (e.g., `release/v1.0.0-alpha.2`)
-6. ✅ Pushes branch and tag to GitHub
-7. ✅ Shows you the PR URL
+1. ✅ Bumps version in Cargo.toml
+2. ✅ Updates Cargo.lock
+3. ✅ Runs all tests
+4. ✅ Creates release commit
+5. ✅ Creates version tag
+6. ✅ Creates release branch (e.g., `release/v1.0.0-alpha.2`)
+7. ✅ Pushes branch and tag to GitHub
+8. ✅ Shows you the PR URL
 
 **Then:**
 - Create the PR from the release branch to master
 - Review and merge through normal PR process
 - GitHub Actions automatically builds and publishes when tag is detected
 
-### Manual Release
+### What Happens After Merge
 
-If you need more control:
-
-1. **Update CHANGELOG.md**: Add changes under `[Unreleased]` section
-
-2. **Run cargo-release locally**:
-   ```bash
-   cargo release alpha -x    # Choose your release type
-   ```
-
-3. **Create and push release branch**:
-   ```bash
-   VERSION=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
-   git branch release/v$VERSION
-   git push origin release/v$VERSION
-   git push origin v$VERSION
-   ```
-
-4. **Create PR** from `release/v{version}` to `master`
-
-5. **After merge**: GitHub Actions automatically handles:
-   - Building binaries for all platforms
-   - Creating GitHub Release
-   - Publishing to crates.io
+GitHub Actions automatically handles:
+- Building binaries for Linux and macOS (x86_64 and ARM64)
+- Creating GitHub Release with uploaded binaries
+- Publishing to crates.io
 
 ### Why This Workflow?
 
 - **Respects branch protection**: Release commits go through PR review
-- **Local control**: You choose when and what to release
+- **Simple**: No external tools, just bash and standard cargo commands
 - **Automated validation**: Tests run before commit is created
 - **Audit trail**: All releases have a corresponding PR
 
