@@ -25,6 +25,9 @@ fastembed = { version = "5.11.0", default-features = false, features = ["online"
 default = []
 embeddings = ["sqlite-vec", "ort", "fastembed"]
 
+[dev-dependencies]
+tempfile = "3.12"
+
 [[bin]]
 name = "komando_exec"
 path = "src/main.rs"
