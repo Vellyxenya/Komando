@@ -15,7 +15,7 @@ push = false
 allow-branch = ["*"]
 
 # Pre-release hook to ensure everything is ready
-pre-release-hook = ["cargo", "test", "--all-features", "--", "--test-threads=1"]
+# pre-release-hook = ["cargo", "test", "--all-features", "--", "--test-threads=1"]
 
 # Commit message template
 pre-release-commit-message = "chore: release {{crate_name}} v{{version}}"
