@@ -24,12 +24,15 @@ cargo install komando
 ### With Semantic Embeddings (Optional)
 To enable AI-powered semantic search:
 ```bash
-# First, set up ONNX Runtime (one-time setup)
-./setup_embeddings.sh
-source ~/.bashrc  # or ~/.zshrc
-
-# Then install with embeddings feature
+# Install with embeddings feature - ONNX Runtime downloads automatically
 cargo install komando --features embeddings
+```
+
+**Note:** The build process will automatically download and set up ONNX Runtime (v1.23.2, ~70MB) during installation. After installation, add these environment variables to your shell RC file (`~/.bashrc` or `~/.zshrc`):
+
+```bash
+export ORT_DYLIB_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib/libonnxruntime.so
+export LD_LIBRARY_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib:$LD_LIBRARY_PATH
 ```
 
 Then source your shell configuration:
@@ -70,17 +73,22 @@ Enables AI-powered semantic search using vector embeddings:
 **Requirements:**
 - GLIBC 2.27 or higher (Ubuntu 18.04+, Debian 10+, etc.)
 - ~100MB disk space for embedding model (downloaded on first use)
+- ~70MB for ONNX Runtime (auto-downloaded during build)
 
 **Setup:**
 ```bash
-# One-time setup: Download and configure ONNX Runtime
-./setup_embeddings.sh
-source ~/.bashrc  # or ~/.zshrc
-
-# Build with embeddings feature
+# Build with embeddings feature - ONNX Runtime downloads automatically
 cargo build --release --features embeddings
 sudo cp target/release/komando_exec /usr/local/bin/
 ```
+
+After building, add these environment variables to your shell RC file (`~/.bashrc` or `~/.zshrc`):
+```bash
+export ORT_DYLIB_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib/libonnxruntime.so
+export LD_LIBRARY_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib:$LD_LIBRARY_PATH
+```
+
+**Note:** The setup_embeddings.sh script is still available if you prefer manual setup or encounter issues with the automatic download.
 
 **What's the difference?**
 - **Standard (Pattern-based)**: Searches for exact text matches in commands. Fast and reliable.
@@ -178,7 +186,11 @@ If you get errors when using the embeddings feature:
    ```
    These should point to your ONNX Runtime installation.
 
-3. **Re-run setup:**
+3. **Check if ONNX Runtime is installed:**
+   ```bash
+   ls -la ~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib/libonnxruntime.so
+   ```
+   If not found, it should have been auto-downloaded during build. You can manually run:
    ```bash
    ./setup_embeddings.sh
    source ~/.bashrc  # or ~/.zshrc

@@ -35,7 +35,7 @@ echo "✅ Clippy passed"
 # 3. Run tests (standard features only for speed)
 echo ""
 echo "🧪 Running tests..."
-if ! cargo test --quiet; then
+if ! cargo test --quiet -- --test-threads=1; then
     echo "❌ Tests failed!"
     exit 1
 fi
