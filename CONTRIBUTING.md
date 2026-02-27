@@ -190,14 +190,18 @@ Komando uses [cargo-release](https://github.com/crate-ci/cargo-release) for auto
 
 2. **Run cargo-release**:
    ```bash
-   # Dry run first
-   cargo release --dry-run
+   # Dry run first (default behavior)
+   cargo release
    
-   # Then release (examples)
-   cargo release patch              # 0.1.1 -> 0.1.2
-   cargo release minor              # 0.1.1 -> 0.2.0
-   cargo release major              # 0.1.1 -> 1.0.0
-   cargo release --pre-release alpha # 0.1.1 -> 0.2.0-alpha.1
+   # Then execute release (examples)
+   cargo release patch -x              # 0.1.1 -> 0.1.2
+   cargo release minor -x              # 0.1.1 -> 0.2.0
+   cargo release major -x              # 0.1.1 -> 1.0.0
+   cargo release alpha -x              # 1.0.0-alpha.1 -> 1.0.0-alpha.2
+   cargo release beta -x               # 1.0.0-alpha.1 -> 1.0.0-beta.1
+   cargo release release -x            # 1.0.0-rc.1 -> 1.0.0
+   
+   # Note: -x flag is required to execute; without it, it's a dry run
    ```
 
 3. **Automated CI/CD**: GitHub Actions automatically:

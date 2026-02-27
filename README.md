@@ -290,22 +290,26 @@ This project uses [cargo-release](https://github.com/crate-ci/cargo-release) for
 
 3. **Run cargo release**:
    ```bash
-   # Dry run to preview changes
-   cargo release --dry-run
+   # Dry run to preview changes (default)
+   cargo release
    
    # Patch release (0.1.1 -> 0.1.2)
-   cargo release patch
+   cargo release patch -x
    
    # Minor release (0.1.1 -> 0.2.0)
-   cargo release minor
+   cargo release minor -x
    
    # Major release (0.1.1 -> 1.0.0)
-   cargo release major
+   cargo release major -x
    
    # Pre-release (alpha, beta, rc)
-   cargo release --pre-release alpha
-   cargo release --pre-release beta
-   cargo release --pre-release rc
+   cargo release alpha -x     # 1.0.0-alpha.1 -> 1.0.0-alpha.2
+   cargo release beta -x      # 1.0.0-alpha.1 -> 1.0.0-beta.1
+   cargo release rc -x        # 1.0.0-beta.1 -> 1.0.0-rc.1
+   cargo release release -x   # 1.0.0-rc.1 -> 1.0.0
+   
+   # Note: -x flag is required to actually execute the release
+   # Without it, cargo-release runs in dry-run mode
    ```
 
 4. **cargo-release will**:
