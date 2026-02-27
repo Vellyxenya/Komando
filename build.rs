@@ -133,7 +133,7 @@ fn setup_onnx_runtime() -> std::io::Result<()> {
 
         // Extract the archive
         let status = Command::new("tar")
-            .args(&[
+            .args([
                 "-xzf",
                 archive_path.to_str().unwrap(),
                 "-C",

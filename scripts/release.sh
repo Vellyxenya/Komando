@@ -17,9 +17,14 @@ success() { echo -e "${GREEN}✓${NC} $1"; }
 warning() { echo -e "${YELLOW}⚠${NC} $1"; }
 error() { echo -e "${RED}✗${NC} $1"; exit 1; }
 
-# Check if we're in the repo root
+# Ensure we are in the project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
+# Check if required files exist
 if [ ! -f "Cargo.toml" ]; then
-    error "Must be run from repository root"
+    error "Cargo.toml not found in project root ($PROJECT_ROOT)"
 fi
 
 # Check for uncommitted changes

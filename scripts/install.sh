@@ -2,6 +2,11 @@
 
 set -e  # Exit on error
 
+# Ensure we are in the project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
 echo "🔨 Building Komando..."
 
 # Check if --embeddings flag is passed
@@ -12,7 +17,7 @@ if [[ "$1" == "--embeddings" ]]; then
     if [[ -z "$ORT_DYLIB_PATH" ]]; then
         echo ""
         echo "⚠️  WARNING: ONNX Runtime environment not detected!"
-        echo "   Run ./setup_embeddings.sh first, then source your shell config"
+        echo "   Run ./scripts/setup_embeddings.sh first, then source your shell config"
         echo ""
         read -p "Continue anyway? (y/N) " -n 1 -r
         echo

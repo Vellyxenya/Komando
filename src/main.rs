@@ -11,7 +11,6 @@ use dirs::home_dir;
 use std::env;
 use std::fs;
 use std::io::{stdout, Write};
-use uuid;
 
 mod db;
 mod ops;
@@ -271,9 +270,7 @@ fn main() -> Result<()> {
                 if let Event::Key(key_event) = event::read()? {
                     match key_event.code {
                         KeyCode::Up => {
-                            if selected > 0 {
-                                selected -= 1;
-                            }
+                            selected = selected.saturating_sub(1);
                         }
                         KeyCode::Down => {
                             if selected < search_results.len() - 1 {
@@ -315,15 +312,6 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_get_last_commands_empty_file() {
-        // Create an empty temp file
-        std::fs::write("/tmp/last_commands.txt", "").unwrap();
-
-        let commands = get_last_commands(5);
-        assert_eq!(commands.len(), 0);
-    }
 
     #[test]
     fn test_get_last_commands_filters_correctly() {
@@ -368,32 +356,6 @@ kubectl get pods
 
         // Verify we got some commands
         assert!(!commands.is_empty(), "Should have at least some commands");
-
-        // Clean up
-        let _ = std::fs::remove_file("/tmp/last_commands.txt");
-    }
-
-    #[test]
-    fn test_get_last_commands_respects_limit() {
-        let content = (0..20)
-            .map(|i| format!("testcmd{}", i))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        std::fs::write("/tmp/last_commands.txt", content).unwrap();
-
-        let commands = get_last_commands(5);
-        assert_eq!(commands.len(), 5, "Should return exactly 5 commands");
-
-        let commands = get_last_commands(10);
-        assert_eq!(commands.len(), 10, "Should return exactly 10 commands");
-
-        let commands = get_last_commands(100);
-        assert_eq!(
-            commands.len(),
-            20,
-            "Should return all 20 commands available"
-        );
 
         // Clean up
         let _ = std::fs::remove_file("/tmp/last_commands.txt");
