@@ -12,7 +12,7 @@ Thank you for your interest in contributing to Komando! This document provides g
    ```
 3. Set up pre-commit hooks:
    ```bash
-   ./setup_hooks.sh
+   ./scripts/setup_hooks.sh
    ```
 
 ## Development Workflow
@@ -92,6 +92,18 @@ git push origin feature/your-feature-name
 
 Then create a Pull Request on GitHub.
 
+## Building for Testing
+
+If you want to build and install the binary completely to test end-to-end:
+
+```bash
+# Standard build
+./scripts/install.sh
+
+# With embeddings
+./scripts/install.sh --embeddings
+```
+
 ## Code Standards
 
 ### Rust Style
@@ -145,13 +157,14 @@ pre-commit run --all-files
 
 ```
 Komando/
-├── src/
+├── src/             # Source code
 │   ├── main.rs      # CLI entry point
 │   ├── db.rs        # SQLite database operations
 │   └── ops.rs       # Legacy JSON migration
+├── scripts/         # Build, install, and release scripts
 ├── hooks/           # Git hook scripts
 ├── .github/         # CI/CD workflows
-└── tests/           # Integration tests (future)
+└── tests/           # Integration tests
 ```
 
 ## Features

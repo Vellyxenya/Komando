@@ -28,11 +28,16 @@ To enable AI-powered semantic search:
 cargo install komando --features embeddings
 ```
 
-**Note:** The build process will automatically download and set up ONNX Runtime (v1.23.2, ~70MB) during installation. After installation, add these environment variables to your shell RC file (`~/.bashrc` or `~/.zshrc`):
+**Note:** The build process will automatically download and set up ONNX Runtime (v1.23.2) during installation. After installation, add these environment variables to your shell RC file (`~/.bashrc` or `~/.zshrc`):
 
 ```bash
-export ORT_DYLIB_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib/libonnxruntime.so
+export ORT_DYLIB_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib/libonnxruntime.so.1.23.2
 export LD_LIBRARY_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib:$LD_LIBRARY_PATH
+```
+
+Alternatively, if you cloned the repository, you can run:
+```bash
+./scripts/setup_embeddings.sh
 ```
 
 Then source your shell configuration:
@@ -52,10 +57,10 @@ Use the install script that builds and installs automatically:
 
 ```bash
 # Standard build (fast pattern matching)
-./install.sh
+./scripts/install.sh
 
 # Or with semantic embeddings (AI-powered search)
-./install.sh --embeddings
+./scripts/install.sh --embeddings
 ```
 
 ## Manual Build
@@ -88,7 +93,11 @@ export ORT_DYLIB_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib/libonnxrun
 export LD_LIBRARY_PATH=~/.onnxruntime/onnxruntime-linux-x64-1.23.2/lib:$LD_LIBRARY_PATH
 ```
 
-**Note:** The setup_embeddings.sh script is still available if you prefer manual setup or encounter issues with the automatic download.
+The setup script is available at `scripts/setup_embeddings.sh`.
+If you prefer manual setup or encounter issues with the automatic download, run:
+```bash
+./scripts/setup_embeddings.sh
+```
 
 **What's the difference?**
 - **Standard (Pattern-based)**: Searches for exact text matches in commands. Fast and reliable.
@@ -192,7 +201,7 @@ If you get errors when using the embeddings feature:
    ```
    If not found, it should have been auto-downloaded during build. You can manually run:
    ```bash
-   ./setup_embeddings.sh
+   ./scripts/setup_embeddings.sh
    source ~/.bashrc  # or ~/.zshrc
    ```
 
@@ -210,108 +219,9 @@ cargo build --release  # Without --features embeddings
 ```
 Pattern-based search is fast and reliable for most use cases.
 
-# Development
+# Contributing
 
-## Setting Up Development Environment
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Vellyxenya/Komando.git
-   cd Komando
-   ```
-
-2. Install pre-commit hooks:
-   ```bash
-   ./setup_hooks.sh
-   ```
-
-   This installs git hooks that automatically run before each commit:
-   - `cargo fmt` - Code formatting check
-   - `cargo clippy` - Linting with warnings as errors
-   - `cargo test` - All unit tests
-   - `cargo check` - Build verification
-
-   **Alternative: Using pre-commit framework**
-   ```bash
-   pip install pre-commit
-   pre-commit install
-   ```
-
-## Running Tests
-
-```bash
-# Run all tests (standard features)
-cargo test
-
-# Run tests with all features
-cargo test --all-features
-
-# Run specific test
-cargo test test_name
-```
-
-## Code Quality
-
-```bash
-# Format code
-cargo fmt --all
-
-# Run linter
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Check without building
-cargo check --all-targets --all-features
-```
-
-## Building
-
-```bash
-# Standard build
-./install.sh
-
-# With embeddings
-./install.sh --embeddings
-```
-
-## Release Process
-
-This project uses an automated release script that handles version bumping and release workflow.
-
-### Making a Release
-
-**Use the release script**:
-
-```bash
-./scripts/release.sh alpha      # 1.0.0-alpha.1 -> 1.0.0-alpha.2
-./scripts/release.sh patch      # 1.0.0 -> 1.0.1
-./scripts/release.sh minor      # 1.0.0 -> 1.1.0
-./scripts/release.sh major      # 1.0.0 -> 2.0.0
-```
-
-The script will:
-1. ✅ Bump version in Cargo.toml
-2. ✅ Update Cargo.lock
-3. ✅ Run all tests
-4. ✅ Create release commit
-5. ✅ Create version tag
-6. ✅ Push release branch to GitHub
-7. ✅ Push tag (triggers release workflow)
-8. ✅ Show you the PR URL
-
-### What Happens Next
-
-After running the script:
-
-1. **Create a PR**: `release/v{version}` → `master` using the URL provided
-2. **Review and merge** the PR
-3. **GitHub Actions automatically**:
-   - Builds binaries for Linux and macOS (x86_64 and ARM64)
-   - Creates a GitHub Release with binaries
-   - Publishes to crates.io
-
-### Configuration
-
-Release behavior is configured in [release.toml](release.toml). The workflow is designed to work with branch protection rules - releases go through the normal PR review process.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to set up your development environment, run tests, and submit pull requests.
 
 # License
 This project is licensed under the MIT License.
