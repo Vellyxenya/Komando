@@ -139,7 +139,7 @@ fn setup_onnx_runtime() -> std::io::Result<()> {
 
         // Use curl to download (available in dev container)
         let status = Command::new("curl")
-            .args(&[
+            .args([
                 "-L", // Follow redirects
                 "-o",
                 archive_path.to_str().unwrap(),
