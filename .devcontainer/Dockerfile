@@ -8,6 +8,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     git \
     libssl-dev \
     pkg-config \
+    vim \
     ca-certificates
 
 # Install Rust for the vscode user

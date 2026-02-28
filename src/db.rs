@@ -118,14 +118,14 @@ impl Db {
         &self,
         query_embedding: &[f32],
         limit: usize,
-    ) -> Result<Vec<(String, String, f32)>> {
+    ) -> Result<Vec<(String, String, Option<String>, f32)>> {
         let embedding_bytes: Vec<u8> = query_embedding
             .iter()
             .flat_map(|f| f.to_ne_bytes())
             .collect();
 
         let mut stmt = self.conn.prepare(
-            "SELECT c.id, c.cmd, e.distance 
+            "SELECT c.id, c.cmd, c.working_directory, e.distance 
              FROM cmd_embeddings e
              JOIN commands c ON c.id = e.cmd_id
              WHERE e.embedding MATCH ?1 
@@ -137,7 +137,8 @@ impl Db {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, f32>(2)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, f32>(3)?,
             ))
         })?;
 
@@ -150,14 +151,22 @@ impl Db {
     }
 
     #[cfg(not(feature = "embeddings"))]
-    pub fn search_commands(&self, query: &str, limit: usize) -> Result<Vec<(String, String)>> {
+    pub fn search_commands(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<(String, String, Option<String>)>> {
         let search_pattern = format!("%{}%", query);
         let mut stmt = self.conn.prepare(
-            "SELECT id, cmd FROM commands WHERE cmd LIKE ?1 ORDER BY created_at DESC LIMIT ?2",
+            "SELECT id, cmd, working_directory FROM commands WHERE cmd LIKE ?1 ORDER BY created_at DESC LIMIT ?2",
         )?;
 
         let rows = stmt.query_map(params![search_pattern, limit as i64], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+            ))
         })?;
 
         let mut results = Vec::new();
