@@ -57,8 +57,22 @@ komando() {
         echo ""
         
         if [ -n "$COMMAND" ]; then
-            echo "Executing '$COMMAND'..."
-            cd "$DIR" && eval "$COMMAND"
+            # Ask execution directory
+            echo "Execute in current directory (.) or original directory ($DIR)? [./original] (default: .)"
+            if [ -n "$BASH_VERSION" ]; then
+                read -p "> " EXEC_LOC
+            else
+                echo -n "> "
+                read -r EXEC_LOC
+            fi
+
+            if [[ "$EXEC_LOC" == "original" ]] || [[ "$EXEC_LOC" == "o" ]]; then
+                echo "Executing '$COMMAND' in $DIR..."
+                (cd "$DIR" && eval "$COMMAND")
+            else
+                echo "Executing '$COMMAND' in current directory..."
+                eval "$COMMAND"
+            fi
         fi
     else
         echo "Error: Komando executable not found"

@@ -105,12 +105,19 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
+    // Check if we should default to save behavior (no other main action specified)
+    let is_default_save = !matches.get_flag("save")
+        && !matches.get_flag("list")
+        && !matches.get_flag("init")
+        && matches.get_one::<String>("delete").is_none()
+        && matches.get_one::<String>("query").is_none();
+
     let count = matches.get_one::<usize>("count").copied().unwrap_or(5);
     let last_commands = get_last_commands(count);
 
     if let Some(home_path) = home_dir() {
         if matches.get_flag("init") {
-            println!("alias komando='eval \"$(komando_exec --query \\\"$@\\\")\"'");
+            println!("alias komando='komando_exec $@'");
             return Ok(());
         }
 
@@ -157,7 +164,7 @@ fn main() -> Result<()> {
 
         let current_dir = env::current_dir()?;
 
-        if matches.get_flag("save") {
+        if matches.get_flag("save") || is_default_save {
             // Get the last command:
             let last_command = last_commands.first();
             if let Some(last_command) = last_command {
