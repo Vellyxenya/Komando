@@ -10,7 +10,7 @@ use crossterm::{
 use dirs::home_dir;
 use std::env;
 use std::fs;
-use std::io::{stdout, Write};
+use std::io::Write;
 
 mod db;
 mod ops;
@@ -105,12 +105,19 @@ fn main() -> Result<()> {
         )
         .get_matches();
 
+    // Check if we should default to save behavior (no other main action specified)
+    let is_default_save = !matches.get_flag("save")
+        && !matches.get_flag("list")
+        && !matches.get_flag("init")
+        && matches.get_one::<String>("delete").is_none()
+        && matches.get_one::<String>("query").is_none();
+
     let count = matches.get_one::<usize>("count").copied().unwrap_or(5);
     let last_commands = get_last_commands(count);
 
     if let Some(home_path) = home_dir() {
         if matches.get_flag("init") {
-            println!("alias komando='eval \"$(komando_exec --query \\\"$@\\\")\"'");
+            println!("alias komando='komando_exec $@'");
             return Ok(());
         }
 
@@ -157,7 +164,7 @@ fn main() -> Result<()> {
 
         let current_dir = env::current_dir()?;
 
-        if matches.get_flag("save") {
+        if matches.get_flag("save") || is_default_save {
             // Get the last command:
             let last_command = last_commands.first();
             if let Some(last_command) = last_command {
@@ -222,7 +229,7 @@ fn main() -> Result<()> {
                 let query_embedding = embedder.embed(query)?;
                 db.search_commands(&query_embedding, 10)?
                     .into_iter()
-                    .map(|(id, cmd, _dist)| (id, cmd))
+                    .map(|(id, cmd, wd, _dist)| (id, cmd, wd))
                     .collect::<Vec<_>>()
             };
 
@@ -236,20 +243,21 @@ fn main() -> Result<()> {
 
             // Interactive selection
             terminal::enable_raw_mode()?;
-            let mut stdout = stdout();
+            // Use stderr for UI so stdout can be used for the result
+            let mut output = std::io::stderr();
             let mut selected = 0;
 
             loop {
                 // Clear screen and reset cursor
-                queue!(stdout, Clear(ClearType::All), MoveTo(0, 0), Hide)?;
+                queue!(output, Clear(ClearType::All), MoveTo(0, 0), Hide)?;
 
                 // Display commands
-                for (i, (_, cmd)) in search_results.iter().enumerate() {
+                for (i, (_, cmd, _)) in search_results.iter().enumerate() {
                     let prefix = if i == selected { "> " } else { "  " };
                     let number = format!("{}. ", i + 1);
 
                     queue!(
-                        stdout,
+                        output,
                         MoveTo(0, i as u16),
                         Clear(ClearType::CurrentLine),
                         Print(prefix),
@@ -259,13 +267,13 @@ fn main() -> Result<()> {
                 }
 
                 queue!(
-                    stdout,
+                    output,
                     MoveTo(0, search_results.len() as u16),
                     Print("Press 'Enter' to execute the selected command, 'Esc' to exit"),
                     Print("\n"),
                 )?;
 
-                stdout.flush()?;
+                output.flush()?;
 
                 if let Event::Key(key_event) = event::read()? {
                     match key_event.code {
@@ -278,14 +286,18 @@ fn main() -> Result<()> {
                             }
                         }
                         KeyCode::Enter => {
-                            let (_, cmd_text) = &search_results[selected];
+                            let (_, cmd_text, wd) = &search_results[selected];
+                            let dir = wd.as_deref().unwrap_or(".");
 
-                            eprintln!("{}", cmd_text);
+                            // Output directory and command separated by semicolon to stdout with prefix
+                            // This format is parsed by the shell function
+                            print!("KOMANDO_EXEC:{};{}", dir, cmd_text);
+                            std::io::stdout().flush()?;
                             break;
                         }
                         KeyCode::Esc => {
                             queue!(
-                                stdout,
+                                output,
                                 MoveTo(0, (search_results.len() + 1) as u16),
                                 Clear(ClearType::CurrentLine),
                             )?;
@@ -298,7 +310,7 @@ fn main() -> Result<()> {
 
             // Disable raw mode and show cursor
             terminal::disable_raw_mode()?;
-            execute!(stdout, Show)?;
+            execute!(output, Show)?;
         }
     } else {
         println!("Could not determine home directory.");

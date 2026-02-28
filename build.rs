@@ -8,35 +8,71 @@ use std::path::PathBuf;
 use std::process::Command;
 
 const SHELL_FUNCTION: &str = r#"
+# Komando Shell Integration v2
 komando() {
     # Capture recent history using fc (works in bash and zsh)
     fc -ln -50 -1 | sed 's/^[[:space:]]*//' > /tmp/last_commands.txt
     RUST_PROGRAM="komando_exec"
     if command -v "$RUST_PROGRAM" > /dev/null 2>&1; then
-        OUTPUT=$("$RUST_PROGRAM" "$@" 2>&1 1>/dev/tty)
+        # Capture stdout (the command to run) while letting stderr (UI) go to the terminal
+        OUTPUT=$("$RUST_PROGRAM" "$@")
         
         if [ -z "$OUTPUT" ]; then
             return
         fi
 
-        # Check if the output contains a semicolon
-        if ! echo "$OUTPUT" | grep -q ";"; then
+        # Check if the output starts with special prefix
+        if [[ "$OUTPUT" != "KOMANDO_EXEC:"* ]]; then
             echo "$OUTPUT"
             return
         fi
 
-        IFS=';' read -r DIR CMD <<< "$OUTPUT"
+        # Remove prefix
+        OUTPUT="${OUTPUT#KOMANDO_EXEC:}"
+        
+        # Split by first semicolon
+        DIR="${OUTPUT%%;*}"
+        CMD="${OUTPUT#*;}"
+        
         echo ""
         echo "=========== Edit the command and then hit 'Enter' ==========="
         echo "Directory: $DIR"
         echo "Command:"
         
-        read -e -i "$CMD" COMMAND
+        if [ -n "$BASH_VERSION" ]; then
+            read -e -i "$CMD" -p "" COMMAND
+        elif [ -n "$ZSH_VERSION" ]; then
+            # Zsh interactive editing
+            COMMAND="$CMD"
+            vared -p "" -c COMMAND
+        else
+            # Fallback for other shells (sh, dash, etc)
+            echo "  (Edit above command and press Enter)"
+            echo "Current: $CMD"
+            read -r COMMAND
+            if [ -z "$COMMAND" ]; then
+                COMMAND="$CMD"
+            fi
+        fi
         echo ""
         
         if [ -n "$COMMAND" ]; then
-            echo "Executing '$COMMAND'..."
-            cd "$DIR" && eval "$COMMAND"
+            # Ask execution directory
+            echo "Execute in current directory (.) or original directory ($DIR)? [./original] (default: .)"
+            if [ -n "$BASH_VERSION" ]; then
+                read -p "> " EXEC_LOC
+            else
+                echo -n "> "
+                read -r EXEC_LOC
+            fi
+
+            if [[ "$EXEC_LOC" == "original" ]] || [[ "$EXEC_LOC" == "o" ]]; then
+                echo "Executing '$COMMAND' in $DIR..."
+                (cd "$DIR" && eval "$COMMAND")
+            else
+                echo "Executing '$COMMAND' in current directory..."
+                eval "$COMMAND"
+            fi
         fi
     else
         echo "Error: Komando executable not found"
@@ -59,7 +95,7 @@ fn setup_shell_integration() -> std::io::Result<()> {
             "cargo:warning=Checking for komando() in {}",
             rc_file.display()
         );
-        if content.contains("komando()") {
+        if content.contains("Komando Shell Integration v2") {
             println!("cargo:warning=Content: {}", content);
             println!("cargo:warning=Shell integration already set up");
             return Ok(());
@@ -117,7 +153,7 @@ fn setup_onnx_runtime() -> std::io::Result<()> {
 
         // Use curl to download (available in dev container)
         let status = Command::new("curl")
-            .args(&[
+            .args([
                 "-L", // Follow redirects
                 "-o",
                 archive_path.to_str().unwrap(),
