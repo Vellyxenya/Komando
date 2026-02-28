@@ -89,6 +89,12 @@ fn main() -> Result<()> {
                 .num_args(1),
         )
         .arg(
+            Arg::new("clear")
+                .long("clear")
+                .help("Delete all saved commands")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
             Arg::new("count")
                 .short('n')
                 .long("number")
@@ -109,6 +115,7 @@ fn main() -> Result<()> {
     let is_default_save = !matches.get_flag("save")
         && !matches.get_flag("list")
         && !matches.get_flag("init")
+        && !matches.get_flag("clear")
         && matches.get_one::<String>("delete").is_none()
         && matches.get_one::<String>("query").is_none();
 
@@ -215,6 +222,21 @@ fn main() -> Result<()> {
                     println!("ID: {}", id);
                 }
                 println!("\nTotal: {} command(s)\n", commands.len());
+            }
+            return Ok(());
+        } else if matches.get_flag("clear") {
+            // Confirm with user
+            eprint!("Are you sure you want to delete all commands? (y/N): ");
+            std::io::stderr().flush()?;
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if input.trim().to_lowercase() == "y" {
+                match db.clear_commands() {
+                    Ok(_) => eprintln!(">>> All commands cleared"),
+                    Err(e) => eprintln!(">>> Error clearing commands: {}", e),
+                }
+            } else {
+                eprintln!(">>> Operation cancelled");
             }
             return Ok(());
         } else if let Some(id) = matches.get_one::<String>("delete") {
