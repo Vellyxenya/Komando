@@ -77,6 +77,18 @@ impl Db {
         working_dir: Option<&str>,
         embedding: &[f32],
     ) -> Result<()> {
+        // Check for existing command and delete it if found
+        {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT id FROM commands WHERE cmd = ?1")?;
+            let mut rows = stmt.query(params![cmd])?;
+            if let Some(row) = rows.next()? {
+                let old_id: String = row.get(0)?;
+                self.delete_command(&old_id)?;
+            }
+        }
+
         let created_at = Utc::now().to_rfc3339();
 
         self.conn.execute(
@@ -103,6 +115,18 @@ impl Db {
         description: Option<&str>,
         working_dir: Option<&str>,
     ) -> Result<()> {
+        // Check for existing command and delete it if found
+        {
+            let mut stmt = self
+                .conn
+                .prepare("SELECT id FROM commands WHERE cmd = ?1")?;
+            let mut rows = stmt.query(params![cmd])?;
+            if let Some(row) = rows.next()? {
+                let old_id: String = row.get(0)?;
+                self.delete_command(&old_id)?;
+            }
+        }
+
         let created_at = Utc::now().to_rfc3339();
 
         self.conn.execute(
@@ -191,6 +215,13 @@ impl Db {
         }
 
         Ok(results)
+    }
+
+    pub fn clear_commands(&self) -> Result<()> {
+        self.conn.execute("DELETE FROM commands", [])?;
+        #[cfg(feature = "embeddings")]
+        self.conn.execute("DELETE FROM cmd_embeddings", [])?;
+        Ok(())
     }
 
     pub fn delete_command(&self, id: &str) -> Result<()> {
